@@ -30,6 +30,28 @@ wait_for_health() {
     done
 }
 
+wait_for_oprf_pub() {
+    local port=$1
+    local timeout=${3:-60}
+    local start_time=$(date +%s)
+    local oprf_key_id=$2
+    echo "waiting for orpf key id $oprf_key_id on port $port to be ready..."
+
+    while true; do
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$port/oprf_pub/$oprf_key_id" || echo "000")
+        if [[ "$http_code" == "200" ]]; then
+            echo "Found oprf key id $oprf_key_id"
+            break
+        fi
+        now=$(date +%s)
+        if (( now - start_time >= timeout )); then
+            echo -e "${RED}error: oprf key id $oprf_key_id was not found after $timeout seconds${NOCOLOR}" >&2
+            exit 1
+        fi
+        sleep 1
+    done
+}
+
 deploy_contracts() {
     # deploy OprfKeyRegistry for 3 nodes and register anvil wallets 7,8,9 as participants
     (cd contracts && TACEO_ADMIN_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 THRESHOLD=2 NUM_PEERS=3 forge script script/deploy/OprfKeyRegistryWithDeps.s.sol --broadcast --fork-url http://127.0.0.1:8545 --private-key $PK)
@@ -97,6 +119,13 @@ setup() {
     wait_for_health 10000 "taceo-salted-nullifier-service0" 300
     wait_for_health 10001 "taceo-salted-nullifier-service1" 300
     wait_for_health 10002 "taceo-salted-nullifier-service2" 300
+
+    echo -e "${GREEN}init an OPRF key..${NOCOLOR}"
+    (cd contracts && OPRF_KEY_REGISTRY_PROXY=$oprf_key_registry OPRF_KEY_ID=1 forge script script/InitKeyGen.s.sol --broadcast --fork-url http://127.0.0.1:8545 --private-key $PK)
+
+    wait_for_oprf_pub 10000 1 300
+    wait_for_oprf_pub 10001 1 300
+    wait_for_oprf_pub 10002 1 300
 }
 
 client() {

@@ -28,9 +28,11 @@ pub async fn salted_nullifier<R: Rng + CryptoRng>(
     let blinding_factor = BlindingFactor::rand(rng);
     let ds = ark_babyjubjub::Fq::from_be_bytes_mod_order(UNSALTED_NULLIFIER_DS);
 
+    let uris =
+        taceo_oprf::client::to_oprf_uri_many(services, "face").context("while building URIs")?;
+
     let verifiable_oprf_output = taceo_oprf::client::distributed_oprf(
-        services,
-        "face",
+        &uris,
         threshold,
         query_hash,
         blinding_factor,

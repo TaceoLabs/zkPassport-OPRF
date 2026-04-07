@@ -67,13 +67,14 @@ start_node() {
     local db_conn="postgres://postgres:postgres@localhost:5432/postgres"
     RUST_LOG="taceo_oprf_service=trace,taceo_salted_nullifier_node=trace,taceo_salted_nullifier_authentication=trace,warn" \
     ./target/release/taceo-salted-nullifier-node \
-        --bind-addr 127.0.0.1:$port \
+        --bind-addr 0.0.0.0:$port \
         --environment dev \
         --version-req ">=0.0.0" \
         --oprf-key-registry-contract $oprf_key_registry \
         --db-connection-string $db_conn \
         --db-schema node$i \
-        --oracle-url https://taceo.io \
+        --oracle-url http://127.0.0.1:8080/ \
+        --ws-max-message-size 262144 \
         > logs/node$i.log 2>&1 &
     pid=$!
     echo "started salted-nullifier-oprf-node $i with PID $pid"

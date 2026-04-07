@@ -1,3 +1,4 @@
+use ark_serialize::CanonicalSerialize;
 use async_trait::async_trait;
 use axum::{http::StatusCode, response::IntoResponse};
 use eyre::Context;
@@ -9,16 +10,52 @@ use taceo_oprf::types::{
 };
 use uuid::Uuid;
 
+/// A single ZKPassport proof, matching the `ProofResult` type from `@zkpassport/utils`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ZKPassportProofResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vkey_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub committed_inputs: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<u32>,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SaltedNullifierRequestAuth {
     pub oprf_key_id: OprfKeyId,
+    pub proofs: Vec<ZKPassportProofResult>,
+}
+
+#[derive(Serialize)]
+struct OracleVerifyRequest {
+    blinded_unique_identifier: String,
+    proofs: Vec<ZKPassportProofResult>,
+}
+
+#[derive(Deserialize)]
+struct OracleVerifyResponse {
+    verified: bool,
+    error: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum SaltedNullifierAuthError {
     /// Cannot reach oracle
     #[error(transparent)]
-    OracleNotRachable(#[from] reqwest::Error),
+    OracleNotReachable(#[from] reqwest::Error),
+    /// Oracle rejected the proofs
+    #[error("Oracle verification failed: {0}")]
+    OracleVerificationFailed(String),
     /// Internal server error
     #[error(transparent)]
     InternalServerError(#[from] eyre::Report),
@@ -28,11 +65,14 @@ impl IntoResponse for SaltedNullifierAuthError {
     fn into_response(self) -> axum::response::Response {
         tracing::debug!("{self:?}");
         match self {
-            SaltedNullifierAuthError::OracleNotRachable(_) => (
+            SaltedNullifierAuthError::OracleNotReachable(_) => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "cannot reach oracle".to_owned(),
             )
                 .into_response(),
+            SaltedNullifierAuthError::OracleVerificationFailed(msg) => {
+                (StatusCode::UNAUTHORIZED, msg).into_response()
+            }
             SaltedNullifierAuthError::InternalServerError(err) => {
                 let error_id = Uuid::new_v4();
                 tracing::error!("{error_id} - {err:?}");
@@ -74,6 +114,15 @@ impl SaltedNullifierOprfRequestAuthenticator {
     }
 }
 
+fn serialize_point_to_hex(point: &ark_babyjubjub::EdwardsAffine) -> eyre::Result<String> {
+    let mut bytes = Vec::new();
+    point
+        .serialize_compressed(&mut bytes)
+        .context("while serializing blinded query point")?;
+    let hex = bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    Ok(format!("0x{hex}"))
+}
+
 #[async_trait]
 impl OprfRequestAuthenticator for SaltedNullifierOprfRequestAuthenticator {
     type RequestAuth = SaltedNullifierRequestAuth;
@@ -83,17 +132,42 @@ impl OprfRequestAuthenticator for SaltedNullifierOprfRequestAuthenticator {
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, Self::RequestAuthError> {
-        tracing::debug!("sending request to oracle: {}", self.oracle_url);
+        let blinded_unique_identifier = serialize_point_to_hex(&request.blinded_query)?;
+
+        let verify_url = self
+            .oracle_url
+            .join("oprf/verify")
+            .context("while building oracle verify URL")?;
+
+        let body = OracleVerifyRequest {
+            blinded_unique_identifier,
+            proofs: request.auth.proofs.clone(),
+        };
+
+        tracing::debug!("sending verify request to oracle: {verify_url}");
         let response = self
             .client
-            .get(self.oracle_url.clone())
+            .post(verify_url)
+            .json(&body)
             .send()
             .await
-            .context("while trying to reach oracle")?;
-        let _response = response.error_for_status()?;
-        // TODO check if validation was ok or not
-        tracing::debug!("got a success response :)");
+            .context("while sending verify request to oracle")?;
 
+        let oracle_response: OracleVerifyResponse = response
+            .json()
+            .await
+            .context("while parsing oracle response")?;
+
+        if !oracle_response.verified {
+            let error_msg = oracle_response
+                .error
+                .unwrap_or_else(|| "unknown".to_owned());
+            return Err(SaltedNullifierAuthError::OracleVerificationFailed(
+                error_msg,
+            ));
+        }
+
+        tracing::debug!("oracle verified proofs successfully");
         Ok(request.auth.oprf_key_id)
     }
 }

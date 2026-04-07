@@ -97,11 +97,15 @@ impl DevClient for SaltedNullifierDevClient {
         // TODO compute a client-side proof and receive the encrypted unsalted nullifier
         let _action = ark_babyjubjub::Fq::rand(&mut rng);
 
+        // TODO: pass real ZKPassport proofs from the client
+        let proofs = vec![];
+
         // the client example internally checks the DLog equality
         let verifiable_oprf_output = salted_nullifier_client::salted_nullifier(
             &config.nodes,
             config.threshold,
             setup.oprf_key_id,
+            proofs,
             connector,
             &mut rng,
         )
@@ -127,6 +131,7 @@ impl DevClient for SaltedNullifierDevClient {
             blinded_query: blinded_query.blinded_query(),
             auth: SaltedNullifierRequestAuth {
                 oprf_key_id: setup.oprf_key_id,
+                proofs: vec![],
             },
         };
         Ok(StressTestItem {

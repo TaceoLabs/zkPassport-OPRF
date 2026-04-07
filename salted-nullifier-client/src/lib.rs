@@ -1,7 +1,7 @@
 use ark_ff::PrimeField as _;
 use eyre::Context;
 use rand::{CryptoRng, Rng};
-use salted_nullifier_authentication::SaltedNullifierRequestAuth;
+use salted_nullifier_authentication::{SaltedNullifierRequestAuth, ZKPassportProofResult};
 use taceo_oprf::{
     client::{Connector, VerifiableOprfOutput},
     core::oprf::BlindingFactor,
@@ -12,8 +12,12 @@ const UNSALTED_NULLIFIER_DS: &[u8] = b"TACEO Unsalted Nullifier Auth";
 
 fn compute_encrypted_unsalted_nullifier(
     oprf_key_id: OprfKeyId,
+    proofs: Vec<ZKPassportProofResult>,
 ) -> (SaltedNullifierRequestAuth, ark_babyjubjub::Fq) {
-    let auth = SaltedNullifierRequestAuth { oprf_key_id };
+    let auth = SaltedNullifierRequestAuth {
+        oprf_key_id,
+        proofs,
+    };
     (auth, rand::random())
 }
 
@@ -21,10 +25,11 @@ pub async fn salted_nullifier<R: Rng + CryptoRng>(
     services: &[String],
     threshold: usize,
     oprf_key_id: OprfKeyId,
+    proofs: Vec<ZKPassportProofResult>,
     connector: Connector,
     rng: &mut R,
 ) -> eyre::Result<VerifiableOprfOutput> {
-    let (oprf_request_auth, query_hash) = compute_encrypted_unsalted_nullifier(oprf_key_id);
+    let (oprf_request_auth, query_hash) = compute_encrypted_unsalted_nullifier(oprf_key_id, proofs);
     let blinding_factor = BlindingFactor::rand(rng);
     let ds = ark_babyjubjub::Fq::from_be_bytes_mod_order(UNSALTED_NULLIFIER_DS);
 

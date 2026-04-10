@@ -115,12 +115,25 @@ impl SaltedNullifierOprfRequestAuthenticator {
 }
 
 fn serialize_point_to_hex(point: &ark_babyjubjub::EdwardsAffine) -> eyre::Result<String> {
-    let mut bytes = Vec::new();
+    // Serialize x and y coordinates in big-endian to match the circuit's public output format
+    // `blinded_query` in circuit returns (x, y) as Field elements which are big-endian
+    let mut x_bytes = Vec::new();
     point
-        .serialize_compressed(&mut bytes)
-        .context("while serializing blinded query point")?;
-    let hex = bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
-    Ok(format!("0x{hex}"))
+        .x
+        .serialize_compressed(&mut x_bytes)
+        .context("while serializing blinded query x coordinate")?;
+    x_bytes.reverse(); // ark serializes in little-endian, circuit outputs are big-endian
+
+    let mut y_bytes = Vec::new();
+    point
+        .y
+        .serialize_compressed(&mut y_bytes)
+        .context("while serializing blinded query y coordinate")?;
+    y_bytes.reverse();
+
+    let hex_x = x_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let hex_y = y_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    Ok(format!("0x{hex_x}{hex_y}"))
 }
 
 #[async_trait]

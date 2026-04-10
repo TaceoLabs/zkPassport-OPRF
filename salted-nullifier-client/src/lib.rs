@@ -1,6 +1,5 @@
 use ark_ff::PrimeField as _;
 use eyre::Context;
-use rand::{CryptoRng, Rng};
 use salted_nullifier_authentication::{SaltedNullifierRequestAuth, ZKPassportProofResult};
 use taceo_oprf::{
     client::{Connector, VerifiableOprfOutput},
@@ -10,27 +9,21 @@ use taceo_oprf::{
 
 const UNSALTED_NULLIFIER_DS: &[u8] = b"TACEO Unsalted Nullifier Auth";
 
-fn compute_encrypted_unsalted_nullifier(
-    oprf_key_id: OprfKeyId,
-    proofs: Vec<ZKPassportProofResult>,
-) -> (SaltedNullifierRequestAuth, ark_babyjubjub::Fq) {
-    let auth = SaltedNullifierRequestAuth {
-        oprf_key_id,
-        proofs,
-    };
-    (auth, rand::random())
-}
-
-pub async fn salted_nullifier<R: Rng + CryptoRng>(
+pub async fn salted_nullifier(
     services: &[String],
     threshold: usize,
     oprf_key_id: OprfKeyId,
     proofs: Vec<ZKPassportProofResult>,
+    private_nullifier: ark_babyjubjub::Fq,
+    beta: ark_babyjubjub::Fr,
     connector: Connector,
-    rng: &mut R,
 ) -> eyre::Result<VerifiableOprfOutput> {
-    let (oprf_request_auth, query_hash) = compute_encrypted_unsalted_nullifier(oprf_key_id, proofs);
-    let blinding_factor = BlindingFactor::rand(rng);
+    let auth = SaltedNullifierRequestAuth {
+        oprf_key_id,
+        proofs,
+    };
+    let blinding_factor =
+        BlindingFactor::from_scalar(beta).expect("Invalid blinding factor");
     let ds = ark_babyjubjub::Fq::from_be_bytes_mod_order(UNSALTED_NULLIFIER_DS);
 
     let uris =
@@ -39,17 +32,14 @@ pub async fn salted_nullifier<R: Rng + CryptoRng>(
     let verifiable_oprf_output = taceo_oprf::client::distributed_oprf(
         &uris,
         threshold,
-        query_hash,
+        private_nullifier,
         blinding_factor,
         ds,
-        oprf_request_auth,
+        auth,
         connector,
     )
     .await
     .context("while computing distributed OPRF")?;
 
-    // TODO
-    // post processing of verifiable oprf-output
-    // potentially won't happen in rust land, therefore maybe we don't really need anything here
     Ok(verifiable_oprf_output)
 }

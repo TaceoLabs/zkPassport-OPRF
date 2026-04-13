@@ -27,7 +27,7 @@ pub async fn salted_nullifier(
     let ds = ark_babyjubjub::Fq::from_be_bytes_mod_order(UNSALTED_NULLIFIER_DS);
 
     let uris =
-        taceo_oprf::client::to_oprf_uri_many(services, "face").context("while building URIs")?;
+        taceo_oprf::client::to_oprf_uri_many(services, "zkpassport").context("while building URIs")?;
 
     let verifiable_oprf_output = taceo_oprf::client::distributed_oprf(
         &uris,

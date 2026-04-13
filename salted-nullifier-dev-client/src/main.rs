@@ -189,6 +189,6 @@ impl DevClient for SaltedNullifierDevClient {
     }
 
     fn auth_module(&self) -> String {
-        "face".to_owned()
+        "zkpassport".to_owned()
     }
 }

@@ -34,7 +34,7 @@ pub async fn start(
         cancellation_token.clone(),
     )
     .await?
-    .module("/face", oprf_req_auth_service)
+    .module("/zkpassport", oprf_req_auth_service)
     .build();
     Ok(result)
 }

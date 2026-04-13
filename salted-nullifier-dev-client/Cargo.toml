@@ -25,6 +25,7 @@ salted-nullifier-authentication = { package = "taceo-salted-nullifier-authentica
 salted-nullifier-client = { package = "taceo-salted-nullifier-client", path = "../salted-nullifier-client", version = "0.1" }
 secrecy.workspace = true
 serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 taceo-nodes-observability.workspace = true
 taceo-oprf = { workspace = true, features = ["dev-client"] }
 tokio = { workspace = true, features = [

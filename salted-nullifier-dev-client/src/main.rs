@@ -1,9 +1,9 @@
 use alloy::{primitives::U160, providers::DynProvider};
-use ark_ff::UniformRand as _;
+use ark_ff::PrimeField;
 use clap::Parser;
 use eyre::Context;
-use rand::{CryptoRng, Rng, SeedableRng as _};
-use salted_nullifier_authentication::SaltedNullifierRequestAuth;
+use rand::{CryptoRng, Rng};
+use salted_nullifier_authentication::{SaltedNullifierRequestAuth, ZKPassportProofResult};
 use taceo_oprf::{
     client::Connector,
     core::oprf::BlindingFactor,
@@ -13,6 +13,54 @@ use taceo_oprf::{
     },
 };
 use uuid::Uuid;
+
+struct FixtureData {
+    proofs: Vec<ZKPassportProofResult>,
+    private_nullifier: ark_babyjubjub::Fq,
+    beta: ark_babyjubjub::Fr,
+}
+
+fn hex_to_bytes(hex: &str) -> Vec<u8> {
+    let hex = hex.strip_prefix("0x").unwrap_or(hex);
+    let hex = if hex.len() % 2 != 0 {
+        format!("0{hex}")
+    } else {
+        hex.to_string()
+    };
+    (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("Invalid hex"))
+        .collect()
+}
+
+/// Load ZKPassport proofs, privateNullifier, and beta from the fixtures file.
+fn load_fixture_data() -> FixtureData {
+    let fixture_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/fixtures/zkpassport-proofs.json"
+    );
+    let data = std::fs::read_to_string(fixture_path)
+        .unwrap_or_else(|e| panic!("Failed to read fixture file {fixture_path}: {e}"));
+    let value: serde_json::Value =
+        serde_json::from_str(&data).expect("Failed to parse fixture JSON");
+
+    let proofs: Vec<ZKPassportProofResult> =
+        serde_json::from_value(value["proofs"].clone()).expect("Failed to parse proofs");
+
+    let pn_hex = value["privateNullifier"]
+        .as_str()
+        .expect("Missing privateNullifier");
+    let private_nullifier = ark_babyjubjub::Fq::from_be_bytes_mod_order(&hex_to_bytes(pn_hex));
+
+    let beta_hex = value["beta"].as_str().expect("Missing beta");
+    let beta = ark_babyjubjub::Fr::from_be_bytes_mod_order(&hex_to_bytes(beta_hex));
+
+    FixtureData {
+        proofs,
+        private_nullifier,
+        beta,
+    }
+}
 
 #[derive(Clone, Parser, Debug)]
 struct SaltedNullifierDevClientConfig {
@@ -92,22 +140,18 @@ impl DevClient for SaltedNullifierDevClient {
         setup: Self::Setup,
         connector: Connector,
     ) -> eyre::Result<ShareEpoch> {
-        let mut rng = rand_chacha::ChaCha12Rng::from_entropy();
+        let fixture = load_fixture_data();
 
-        // TODO compute a client-side proof and receive the encrypted unsalted nullifier
-        let _action = ark_babyjubjub::Fq::rand(&mut rng);
-
-        // TODO: pass real ZKPassport proofs from the client
-        let proofs = vec![];
-
-        // the client example internally checks the DLog equality
+        // Use the fixture's privateNullifier and beta so the blinded query
+        // matches the oprf_auth proof and passes oracle verification
         let verifiable_oprf_output = salted_nullifier_client::salted_nullifier(
             &config.nodes,
             config.threshold,
             setup.oprf_key_id,
-            proofs,
+            fixture.proofs,
+            fixture.private_nullifier,
+            fixture.beta,
             connector,
-            &mut rng,
         )
         .await
         .context("while computing salted nullifier")?;
@@ -118,20 +162,22 @@ impl DevClient for SaltedNullifierDevClient {
     async fn prepare_stress_test_item<R: Rng + CryptoRng + Send>(
         &self,
         setup: &Self::Setup,
-        rng: &mut R,
+        _rng: &mut R,
     ) -> eyre::Result<StressTestItem<Self::RequestAuth>> {
         let request_id = Uuid::new_v4();
-        let action = ark_babyjubjub::Fq::rand(rng);
-        let blinding_factor = BlindingFactor::rand(rng);
-        let query = action;
-        let blinded_query =
-            taceo_oprf::core::oprf::client::blind_query(query, blinding_factor.clone());
+        let fixture = load_fixture_data();
+        let blinding_factor =
+            BlindingFactor::from_scalar(fixture.beta).expect("Invalid blinding factor");
+        let blinded_query = taceo_oprf::core::oprf::client::blind_query(
+            fixture.private_nullifier,
+            blinding_factor.clone(),
+        );
         let init_request = OprfRequest {
             request_id,
             blinded_query: blinded_query.blinded_query(),
             auth: SaltedNullifierRequestAuth {
                 oprf_key_id: setup.oprf_key_id,
-                proofs: vec![],
+                proofs: fixture.proofs,
             },
         };
         Ok(StressTestItem {
@@ -150,6 +196,6 @@ impl DevClient for SaltedNullifierDevClient {
     }
 
     fn auth_module(&self) -> String {
-        "face".to_owned()
+        "zkpassport".to_owned()
     }
 }

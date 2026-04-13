@@ -1,31 +1,66 @@
-use std::{process::ExitCode, sync::Arc};
+use std::{net::SocketAddr, process::ExitCode, sync::Arc, time::Duration};
 
-use clap::Parser as _;
 use eyre::Context as _;
+use serde::Deserialize;
+use taceo_nodes_common::postgres::PostgresConfig;
 use taceo_oprf::service::secret_manager::postgres::PostgresSecretManager;
-use taceo_salted_nullifier_node::config::SaltedNullifierOprfNodeConfig;
+use taceo_zkpassport_oprf_node::config::ZkPassportNodeConfig;
+
+#[derive(Clone, Debug, Deserialize)]
+struct FullZkPassportNodeConfig {
+    /// The bind addr of the AXUM server
+    #[serde(default = "default_bind_addr")]
+    pub bind_addr: SocketAddr,
+    /// Max wait time the service waits for its workers during shutdown.
+    #[serde(default = "default_max_wait_shutdown")]
+    #[serde(with = "humantime_serde")]
+    pub max_wait_time_shutdown: Duration,
+    /// The OPRF service config
+    #[serde(rename = "service")]
+    pub node_config: ZkPassportNodeConfig,
+    /// The postgres config for the secret-manager
+    #[serde(rename = "postgres")]
+    pub postgres_config: PostgresConfig,
+}
+
+fn load_zk_passport_id_config() -> eyre::Result<FullZkPassportNodeConfig> {
+    let cfg = config::Config::builder().add_source(
+        config::Environment::with_prefix("TACEO_OPRF_NODE")
+            .separator("__")
+            .list_separator(",")
+            .with_list_parse_key("service.rpc.http_urls")
+            .try_parsing(true),
+    );
+
+    cfg.build()
+        .context("while building from config")?
+        .try_deserialize()
+        .context("while parsing config")
+}
+
+fn default_bind_addr() -> SocketAddr {
+    "0.0.0.0:4321".parse().expect("valid SocketAddr")
+}
+
+const fn default_max_wait_shutdown() -> Duration {
+    Duration::from_secs(10)
+}
 
 async fn run() -> eyre::Result<()> {
     taceo_oprf::service::metrics::describe_metrics();
-    taceo_salted_nullifier_node::metrics::describe_metrics();
+    taceo_zkpassport_oprf_node::metrics::describe_metrics();
 
     tracing::info!("{}", taceo_nodes_common::version_info!());
 
-    let config = SaltedNullifierOprfNodeConfig::parse();
+    let config = load_zk_passport_id_config()?;
     tracing::info!("starting oprf-node with config: {config:#?}");
 
     // Load the postgres secret manager.
+    tracing::info!("connect to postgres secret-manager..");
     let secret_manager = Arc::new(
-        PostgresSecretManager::init(
-            &config.node_config.db_connection_string,
-            &config.node_config.db_schema,
-            config.node_config.db_max_connections,
-            config.node_config.db_acquire_timeout,
-            config.node_config.db_max_retries,
-            config.node_config.db_retry_delay,
-        )
-        .await
-        .context("while initializing Postgres secret manager")?,
+        PostgresSecretManager::init(&config.postgres_config)
+            .await
+            .context("while starting postgres secret-manager")?,
     );
 
     let (cancellation_token, _) =
@@ -35,10 +70,13 @@ async fn run() -> eyre::Result<()> {
     let bind_addr = config.bind_addr;
     let max_wait_time_shutdown = config.max_wait_time_shutdown;
 
-    tracing::info!("starting world-node service...");
-    let (oprf_service_router, oprf_node_tasks) =
-        taceo_salted_nullifier_node::start(config, secret_manager, cancellation_token.clone())
-            .await?;
+    tracing::info!("starting zkPassport service...");
+    let (oprf_service_router, oprf_node_tasks) = taceo_zkpassport_oprf_node::start(
+        config.node_config,
+        secret_manager,
+        cancellation_token.clone(),
+    )
+    .await?;
 
     let server = tokio::spawn({
         let cancellation_token = cancellation_token.clone();

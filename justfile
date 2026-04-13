@@ -29,4 +29,4 @@ run-setup:
 
 [group('deploy')]
 run-dev-client *args:
-    cargo run --release --bin taceo-salted-nullifier-dev-client {{ args }}
+    cargo run --release --bin taceo-zkpassport-oprf-dev-client {{ args }}

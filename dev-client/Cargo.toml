@@ -1,9 +1,9 @@
 [package]
-name = "taceo-salted-nullifier-dev-client"
+name = "taceo-zkpassport-dev-client"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "Dev-Client for salted-nullifier instance of TACEO:OPRF. Used for testing."
+description = "Dev-Client for zkPassport instance of TACEO:OPRF. Used for testing."
 readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -17,14 +17,9 @@ ark-babyjubjub.workspace = true
 ark-ff.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 eyre.workspace = true
-humantime.workspace = true
 rand.workspace = true
 rand_chacha.workspace = true
 rustls.workspace = true
-salted-nullifier-authentication = { package = "taceo-salted-nullifier-authentication", path = "../salted-nullifier-authentication", version = "0.1" }
-salted-nullifier-client = { package = "taceo-salted-nullifier-client", path = "../salted-nullifier-client", version = "0.1" }
-secrecy.workspace = true
-serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 taceo-nodes-observability.workspace = true
 taceo-oprf = { workspace = true, features = ["dev-client"] }
@@ -38,4 +33,5 @@ tokio = { workspace = true, features = [
 ] }
 tracing.workspace = true
 uuid = { workspace = true, features = ["serde", "v4"] }
-webpki-roots.workspace = true
+zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
+zkpassport-oprf-client = { package = "taceo-zkpassport-oprf-client", path = "../client", version = "0.1" }

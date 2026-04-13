@@ -1,0 +1,18 @@
+[package]
+name = "taceo-zkpassport-oprf-authentication"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Authentication module for zkPassport instance of TACEO:OPRF"
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["cryptography", "mpc", "oprf"]
+publish.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+taceo-oprf = { workspace = true, features = ["types"] }
+thiserror.workspace = true

@@ -1,11 +1,11 @@
-//! Metrics definitions for the Salted nullifier OPRF service.
+//! Metrics definitions for the zkPassport OPRF service.
 //!
 //! This module defines all metrics keys used by the service and
 //! provides a helper [`describe_metrics`] to set metadata for
 //! each metric using the `metrics` crate.
 
 /// Metrics placeholder
-pub const METRICS_ID_ORACLE_HEALTH: &str = "taceo.salted.nullifier.oprf.health";
+pub const METRICS_ID_ORACLE_HEALTH: &str = "taceo.zkpassport.nullifier.oprf.health";
 
 /// Describe all metrics used by the service.
 ///

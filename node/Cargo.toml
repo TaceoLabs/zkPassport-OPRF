@@ -1,9 +1,9 @@
 [package]
-name = "taceo-salted-nullifier-node"
+name = "taceo-zkpassport-oprf-node"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "Backend server for salted-nullifier instance of TACEO:OPRF"
+description = "Backend server for zkPassport instance of TACEO:OPRF"
 readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -12,18 +12,22 @@ keywords = ["cryptography", "mpc", "oprf"]
 publish.workspace = true
 
 [dependencies]
-aws-config = { workspace = true, features = ["behavior-version-latest"] }
+alloy = { workspace = true }
+ark-serde-compat = { workspace = true, features = ["babyjubjub"] }
+ark-serialize.workspace = true
 axum = { workspace = true, features = ["ws"] }
-clap = { workspace = true, features = ["derive", "env"] }
+config = { workspace = true }
 eyre.workspace = true
 humantime.workspace = true
+humantime-serde.workspace = true
 metrics = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
-salted-nullifier-authentication = { package = "taceo-salted-nullifier-authentication", path = "../salted-nullifier-authentication", version = "0.1" }
-taceo-nodes-common = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+taceo-nodes-common = { workspace = true, features = ["alloy", "postgres"] }
 taceo-nodes-observability = { workspace = true }
 taceo-oprf = { workspace = true, features = ["service"] }
+thiserror.workspace = true
 tokio = { workspace = true, features = [
   "net",
   "rt-multi-thread",
@@ -34,3 +38,4 @@ tokio = { workspace = true, features = [
 ] }
 tokio-util.workspace = true
 tracing.workspace = true
+zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }

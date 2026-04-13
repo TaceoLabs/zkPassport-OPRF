@@ -22,12 +22,11 @@ pub async fn salted_nullifier(
         oprf_key_id,
         proofs,
     };
-    let blinding_factor =
-        BlindingFactor::from_scalar(beta).expect("Invalid blinding factor");
+    let blinding_factor = BlindingFactor::from_scalar(beta).expect("Invalid blinding factor");
     let ds = ark_babyjubjub::Fq::from_be_bytes_mod_order(UNSALTED_NULLIFIER_DS);
 
-    let uris =
-        taceo_oprf::client::to_oprf_uri_many(services, "zkpassport").context("while building URIs")?;
+    let uris = taceo_oprf::client::to_oprf_uri_many(services, "zkpassport")
+        .context("while building URIs")?;
 
     let verifiable_oprf_output = taceo_oprf::client::distributed_oprf(
         &uris,

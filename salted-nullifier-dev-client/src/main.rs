@@ -47,13 +47,19 @@ fn load_fixture_data() -> FixtureData {
     let proofs: Vec<ZKPassportProofResult> =
         serde_json::from_value(value["proofs"].clone()).expect("Failed to parse proofs");
 
-    let pn_hex = value["privateNullifier"].as_str().expect("Missing privateNullifier");
+    let pn_hex = value["privateNullifier"]
+        .as_str()
+        .expect("Missing privateNullifier");
     let private_nullifier = ark_babyjubjub::Fq::from_be_bytes_mod_order(&hex_to_bytes(pn_hex));
 
     let beta_hex = value["beta"].as_str().expect("Missing beta");
     let beta = ark_babyjubjub::Fr::from_be_bytes_mod_order(&hex_to_bytes(beta_hex));
 
-    FixtureData { proofs, private_nullifier, beta }
+    FixtureData {
+        proofs,
+        private_nullifier,
+        beta,
+    }
 }
 
 #[derive(Clone, Parser, Debug)]
@@ -160,7 +166,8 @@ impl DevClient for SaltedNullifierDevClient {
     ) -> eyre::Result<StressTestItem<Self::RequestAuth>> {
         let request_id = Uuid::new_v4();
         let fixture = load_fixture_data();
-        let blinding_factor = BlindingFactor::from_scalar(fixture.beta).expect("Invalid blinding factor");
+        let blinding_factor =
+            BlindingFactor::from_scalar(fixture.beta).expect("Invalid blinding factor");
         let blinded_query = taceo_oprf::core::oprf::client::blind_query(
             fixture.private_nullifier,
             blinding_factor.clone(),

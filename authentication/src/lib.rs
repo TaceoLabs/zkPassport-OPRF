@@ -25,7 +25,7 @@ pub enum AuthModules {
 
 impl core::fmt::Display for AuthModules {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("face")
+        f.write_str("zkpassport")
     }
 }
 

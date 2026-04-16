@@ -4,6 +4,7 @@ members = [
   "authentication",
   "client",
   "dev-client",
+  "mock-oracle",
   "node",
 ]
 

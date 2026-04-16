@@ -21,7 +21,7 @@ jobs:
     uses: ./.github/workflows/build-and-push.yml
     with:
       image-name: zkpassport-oprf-node
-      dockerfile: build/Dockerfile.oprf-key-gen
+      dockerfile: build/Dockerfile.zkpassport.node
     secrets:
       AWS_ARCHIVE_ROLE: ${{ secrets.AWS_ARCHIVE_ROLE }}
       AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}

@@ -19,7 +19,7 @@ COPY . .
 RUN cargo build --release --locked --bin taceo-zkpassport-oprf-node
 
 # Build healthcheck
-FROM rust:1.88-bookworm AS healthcheck-builder
+FROM rust:1.91.0-bookworm AS healthcheck-builder
 RUN cargo install simple-web-healthcheck
 
 FROM gcr.io/distroless/cc-debian13:nonroot AS runtime
@@ -33,5 +33,4 @@ LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 WORKDIR /app
 COPY --from=healthcheck-builder /usr/local/cargo/bin/simple-web-healthcheck /healthcheck
 COPY --from=builder /app/target/release/taceo-zkpassport-oprf-node /app/taceo-zkpassport-oprf-node
-HEALTHCHECK CMD ["/healthcheck"]
 ENTRYPOINT ["/app/taceo-zkpassport-oprf-node"]

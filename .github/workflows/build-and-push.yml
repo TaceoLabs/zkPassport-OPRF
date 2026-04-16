@@ -243,7 +243,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: ${{ runner.temp }}/sboms
-          pattern: "*.spdx.json"
+          pattern: "*-sbom.spdx.json"
           merge-multiple: true
       
       - name: Upload file to S3

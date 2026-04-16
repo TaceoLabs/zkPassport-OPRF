@@ -8,10 +8,6 @@ on:
     tags:
       - 'zkpassport-oprf-node-v*'
 
-permissions:
-  contents: read # Required for the checkout action
-  packages: write
-
 jobs:
   workflow:
     permissions:

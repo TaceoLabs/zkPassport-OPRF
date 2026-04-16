@@ -212,7 +212,7 @@ jobs:
 
           labels: |
             org.opencontainers.image.title=${{ inputs.image-name }}
-            org.opencontainers.image.description=Docker image for ${{ inputs.image-name }} from ${{ github.repository_owner }}/${{ github.repository }}
+            org.opencontainers.image.description=Docker image for ${{ inputs.image-name }} from ${{ github.repository }}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
 
       - name: Create manifest list and push
@@ -220,7 +220,7 @@ jobs:
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             --annotation "index:org.opencontainers.image.title=${{ inputs.image-name }}" \
-            --annotation "index:org.opencontainers.image.description=Docker image for ${{ inputs.image-name }} from ${{ github.repository_owner }}/${{ github.repository }}" \
+            --annotation "index:org.opencontainers.image.description=Docker image for ${{ inputs.image-name }} from ${{ github.repository }}" \
             --annotation "index:org.opencontainers.image.vendor=${{ github.repository_owner }}" \
             $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 

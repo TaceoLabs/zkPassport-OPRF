@@ -1,3 +1,10 @@
+//! OPRF Node Binary for zkPassport.
+//!
+//! Main entry point for the zkPassport OPRF service node. Loads configuration
+//! from environment variables using the `TACEO_OPRF_NODE__` prefix, initializes
+//! the PostgreSQL secret manager, and starts the Axum server with graceful
+//! shutdown support.
+
 use std::{net::SocketAddr, process::ExitCode, sync::Arc, time::Duration};
 
 use eyre::Context as _;
@@ -6,6 +13,7 @@ use taceo_nodes_common::postgres::PostgresConfig;
 use taceo_oprf::service::secret_manager::postgres::PostgresSecretManager;
 use taceo_zkpassport_oprf_node::config::ZkPassportNodeConfig;
 
+/// Top-level configuration for the OPRF node, loaded from `TACEO_OPRF_NODE__*` environment variables.
 #[derive(Clone, Debug, Deserialize)]
 struct FullZkPassportNodeConfig {
     /// The bind addr of the AXUM server
@@ -23,6 +31,13 @@ struct FullZkPassportNodeConfig {
     pub postgres_config: PostgresConfig,
 }
 
+/// Load and deserialize the node configuration from environment variables.
+///
+/// Uses the `TACEO_OPRF_NODE__` prefix with `__` as separator.
+/// The `service.rpc.http_urls` key is parsed as a comma-separated list.
+///
+/// # Errors
+/// Returns an error if any required variable is missing or cannot be parsed.
 fn load_zk_passport_id_config() -> eyre::Result<FullZkPassportNodeConfig> {
     let cfg = config::Config::builder().add_source(
         config::Environment::with_prefix("TACEO_OPRF_NODE")
@@ -38,14 +53,20 @@ fn load_zk_passport_id_config() -> eyre::Result<FullZkPassportNodeConfig> {
         .context("while parsing config")
 }
 
+/// Default bind address (`0.0.0.0:4321`) used when `TACEO_OPRF_NODE__BIND_ADDR` is not set.
 fn default_bind_addr() -> SocketAddr {
     "0.0.0.0:4321".parse().expect("valid SocketAddr")
 }
 
+/// Default maximum time to wait for graceful shutdown (10 seconds).
 const fn default_max_wait_shutdown() -> Duration {
     Duration::from_secs(10)
 }
 
+/// Core async runtime: loads config, starts services, runs the Axum server, and waits for shutdown.
+///
+/// # Errors
+/// Returns an error if startup fails or if a spawned task returns an error during shutdown.
 async fn run() -> eyre::Result<()> {
     taceo_oprf::service::metrics::describe_metrics();
     taceo_zkpassport_oprf_node::metrics::describe_metrics();

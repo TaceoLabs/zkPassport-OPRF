@@ -12,20 +12,27 @@ use taceo_oprf::types::{
 };
 use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth, ZKPassportProofResult};
 
+/// Request body sent to the oracle's proof-verification endpoint (`POST /oprf/verify`).
 #[derive(Debug, Clone, Serialize)]
 pub struct OracleVerifyRequest {
     #[serde(serialize_with = "serialize_point_to_hex")]
+    /// The blinded unique identifier (BabyJubJub affine point), hex-encoded as `"0x<x><y>"`.
     blinded_unique_identifier: ark_babyjubjub::EdwardsAffine,
+    /// The zkPassport proofs submitted by the client.
     proofs: Vec<ZKPassportProofResult>,
 }
 
+/// Response body received from the oracle's verification endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OracleVerifyResponse {
+    /// Whether the oracle accepted the proofs.
     verified: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional error message returned when `verified` is `false`.
     error: Option<String>,
 }
 
+/// Errors that can occur while authenticating an OPRF request via the face-match oracle.
 #[derive(Debug, thiserror::Error)]
 pub enum FaceMatchAuthError {
     /// Cannot reach oracle
@@ -50,6 +57,10 @@ impl From<FaceMatchAuthError> for AuthErrorKind {
 }
 
 impl FaceMatchAuthError {
+    /// Log the error at the appropriate tracing level.
+    ///
+    /// [`Internal`](Self::Internal) errors are logged at `error` level with a full
+    /// report chain; all other variants are logged at `debug` level.
     pub fn log(&self) {
         if let Self::Internal(report) = self {
             tracing::error!("{report:?}");
@@ -59,12 +70,24 @@ impl FaceMatchAuthError {
     }
 }
 
+/// Authenticator that verifies zkPassport face-match proofs by forwarding them to an oracle.
+///
+/// Implements [`OprfRequestAuthenticator`] and is registered on the OPRF service builder
+/// for the `face` authentication module.
 pub struct FaceMatchAuthenticator {
     client: reqwest::Client,
     verify_url: Url,
 }
 
 impl FaceMatchAuthenticator {
+    /// Initialize the authenticator and verify the oracle is reachable.
+    ///
+    /// Builds an HTTP client, pings the oracle's health endpoint, and constructs the
+    /// `verify_url` used for subsequent proof-verification requests.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP client cannot be built or the oracle does not
+    /// respond with `200 OK`.
     pub async fn init(oracle_url: Url) -> eyre::Result<Self> {
         // we use the client-builder to avoid panic if we cannot install tls backend
         let client = ClientBuilder::new()
@@ -91,6 +114,10 @@ impl FaceMatchAuthenticator {
         })
     }
 
+    /// Send the OPRF request's blinded query and proofs to the oracle and return the key ID.
+    ///
+    /// Returns [`FaceMatchAuthError::OracleVerificationFailed`] if the oracle
+    /// reports `verified: false`.
     async fn authenticate_inner(
         &self,
         request: &OprfRequest<FaceMatchRequestAuth>,
@@ -141,6 +168,11 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
     }
 }
 
+/// Serialize a BabyJubJub affine point to a `"0x<x><y>"` hex string.
+///
+/// Coordinates are serialized in big-endian byte order to match the circuit's
+/// public output format. `ark-serialize` returns little-endian bytes, so both
+/// coordinate byte vectors are reversed before encoding.
 fn serialize_point_to_hex<S: Serializer>(
     point: &ark_babyjubjub::EdwardsAffine,
     ser: S,

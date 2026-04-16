@@ -1,3 +1,12 @@
+//! Mock oracle for local development of the zkPassport OPRF service.
+//!
+//! This binary starts a lightweight Axum HTTP server that unconditionally
+//! returns `verified: true` for every proof-verification request on
+//! `POST /oprf/verify`. It is **not** intended for production use.
+//!
+//! Configure the bind address via the `MOCK_ORACLE_BIND_ADDR` environment
+//! variable (default: `0.0.0.0:3000`).
+
 use std::net::SocketAddr;
 
 use axum::{

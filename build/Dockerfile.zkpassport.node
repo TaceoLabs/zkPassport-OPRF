@@ -20,7 +20,7 @@ RUN cargo build --release --locked --bin taceo-zkpassport-oprf-node
 
 # Build healthcheck
 FROM rust:1.91.0-bookworm AS healthcheck-builder
-RUN cargo install simple-web-healthcheck
+RUN cargo install --locked simple-web-healthcheck
 
 FROM gcr.io/distroless/cc-debian13:nonroot AS runtime
 ARG GIT_HASH

@@ -1,3 +1,19 @@
+//! Development and testing client for the zkPassport OPRF service.
+//!
+//! This binary exercises the full distributed OPRF + zkPassport authentication
+//! flow against a local or remote setup. It loads fixture data (proofs,
+//! `privateNullifier`, `beta`) from `fixtures/zkpassport-proofs.json` and
+//! delegates to the upstream [`taceo_oprf::dev_client::DevClient`] framework
+//! for stress tests, reshare tests, and delete tests.
+//!
+//! Run via:
+//!
+//! ```sh
+//! just run-dev-client <command>
+//! ```
+
+use std::num::NonZeroUsize;
+
 use alloy::{primitives::U160, providers::DynProvider};
 use ark_ff::PrimeField;
 use clap::Parser;
@@ -140,11 +156,14 @@ impl DevClient for FaceMatchDevClient {
     ) -> eyre::Result<ShareEpoch> {
         let fixture = load_fixture_data();
 
+        // remove this if we update the upstream crate
+        let threshold = NonZeroUsize::try_from(config.threshold).context("threshold is 0")?;
+
         // Use the fixture's privateNullifier and beta so the blinded query
         // matches the oprf_auth proof and passes oracle verification
         let verifiable_oprf_output = zkpassport_oprf_client::face_match_oprf(
             &config.nodes,
-            config.threshold,
+            threshold,
             setup.oprf_key_id,
             fixture.proofs,
             fixture.private_nullifier,

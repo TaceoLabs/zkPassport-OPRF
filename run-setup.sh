@@ -66,7 +66,7 @@ start_node() {
     local port=$((10000 + i))
     local db_conn="postgres://postgres:postgres@localhost:5432/postgres"
     RUST_LOG="taceo=trace,warn" \
-    TACEO_OPRF_NODE__BIND_ADDR=127.0.0.1:$port \
+    TACEO_OPRF_NODE__BIND_ADDR=0.0.0.0:$port \
     TACEO_OPRF_NODE__SERVICE__ORACLE_URL="http://127.0.0.1:3000" \
     TACEO_OPRF_NODE__SERVICE__OPRF__ENVIRONMENT=dev \
     TACEO_OPRF_NODE__SERVICE__OPRF__OPRF_KEY_REGISTRY_CONTRACT=$oprf_key_registry \

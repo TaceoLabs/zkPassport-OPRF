@@ -13,6 +13,13 @@ use taceo_nodes_common::postgres::PostgresConfig;
 use taceo_oprf::service::secret_manager::postgres::PostgresSecretManager;
 use taceo_zkpassport_oprf_node::config::ZkPassportNodeConfig;
 
+#[cfg(not(target_env = "msvc"))]
+use tikv_jemallocator::Jemalloc;
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 /// Top-level configuration for the OPRF node, loaded from `TACEO_OPRF_NODE__*` environment variables.
 #[derive(Clone, Debug, Deserialize)]
 struct FullZkPassportNodeConfig {

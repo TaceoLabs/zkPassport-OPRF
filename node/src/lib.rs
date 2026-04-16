@@ -16,6 +16,7 @@ use std::sync::Arc;
 use eyre::Context;
 use taceo_oprf::service::{StartedServices, secret_manager::SecretManagerService};
 use tokio_util::sync::CancellationToken;
+use tower_http::cors::CorsLayer;
 use zkpassport_oprf_authentication::AuthModules;
 
 use crate::{config::ZkPassportNodeConfig, services::FaceMatchAuthenticator};
@@ -64,7 +65,7 @@ pub async fn start(
     );
 
     tracing::info!("init oprf service..");
-    let result = taceo_oprf::service::OprfServiceBuilder::init(
+    let (router, tasks) = taceo_oprf::service::OprfServiceBuilder::init(
         node_config,
         secret_manager,
         rpc_provider,
@@ -77,5 +78,7 @@ pub async fn start(
         oprf_req_auth_service,
     )
     .build();
-    Ok(result)
+
+    let router = router.layer(CorsLayer::permissive());
+    Ok((router, tasks))
 }

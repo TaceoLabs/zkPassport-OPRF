@@ -77,7 +77,7 @@ start_node() {
     TACEO_OPRF_NODE__SERVICE__RPC__CHAIN_ID=31337 \
     TACEO_OPRF_NODE__POSTGRES__CONNECTION_STRING=$db_conn \
     TACEO_OPRF_NODE__POSTGRES__SCHEMA=oprf$i \
-    ./target/release/taceo-zkpassport-oprf-node > logs/node$i.log 2>&1 &
+    ./target/debug/taceo-zkpassport-oprf-node > logs/node$i.log 2>&1 &
     pid=$!
     echo "started oprf-node $i with PID $pid"
 }
@@ -91,7 +91,7 @@ teardown() {
 
 start_mock_oracle() {
     MOCK_ORACLE_BIND_ADDR=0.0.0.0:3000 \
-    ./target/release/taceo-zkpassport-oprf-mock-oracle > logs/mock-oracle.log 2>&1 &
+    ./target/debug/taceo-zkpassport-oprf-mock-oracle > logs/mock-oracle.log 2>&1 &
     pid=$!
     echo "started mock-oracle with PID $pid"
 }
@@ -169,7 +169,7 @@ setup() {
 }
 
 client() {
-    ./target/release/taceo-zkpassport-dev-client "$@"
+    ./target/debug/taceo-zkpassport-dev-client "$@"
 }
 
 main() {
@@ -179,13 +179,13 @@ main() {
     fi
 
     if [[ $1 = "setup" ]]; then
-        cargo build --workspace --release
+        cargo build --workspace 
         echo -e "${GREEN}running setup..${NOCOLOR}"
         setup
         echo -e "${GREEN}press Ctrl+C to stop${NOCOLOR}"
         wait
     elif [[ $1 = "e2e-test" ]]; then
-        cargo build --workspace --release
+        cargo build --workspace
         echo -e "${GREEN}running test..${NOCOLOR}"
         setup
         client --nodes http://127.0.0.1:10000,http://127.0.0.1:10001,http://127.0.0.1:10002 --oprf-key-registry-contract $oprf_key_registry --max-wait-time 10min reshare-test 

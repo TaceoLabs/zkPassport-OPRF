@@ -72,6 +72,10 @@ uuid = { version = "1" }
 webpki-roots = { version = "1.0" }
 zeroize = "1"
 
+[profile.release]
+lto = true
+codegen-units = 1
+
 # This profile can be used for CI in pull requests.
 [profile.ci-dev]
 inherits = "dev"

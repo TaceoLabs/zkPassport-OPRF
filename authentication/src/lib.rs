@@ -1,3 +1,19 @@
+#![deny(missing_docs)]
+#![deny(clippy::all, clippy::pedantic)]
+#![deny(
+    clippy::allow_attributes_without_reason,
+    clippy::assertions_on_result_states,
+    clippy::dbg_macro,
+    clippy::decimal_literal_representation,
+    clippy::iter_over_hash_type,
+    clippy::let_underscore_must_use,
+    clippy::missing_assert_message,
+    clippy::print_stderr,
+    clippy::print_stdout,
+    clippy::undocumented_unsafe_blocks,
+    clippy::unnecessary_safety_comment,
+    clippy::unwrap_used
+)]
 //! Authentication types for the zkPassport OPRF service.
 //!
 //! This crate defines the types and error handling used to authenticate
@@ -5,7 +21,7 @@
 //!
 //! * [`FaceMatchRequestAuth`] — the authentication payload sent by a client,
 //!   containing an OPRF key ID and a list of zkPassport proofs.
-//! * [`ZKPassportProofResult`] — a single ZKPassport proof matching the
+//! * [`ZKPassportProofResult`] — a single zkPassport proof matching the
 //!   `ProofResult` type from `@zkpassport/utils`.
 //! * [`AuthModules`] — an enum of supported authentication modules
 //!   (currently `FaceMatch`).
@@ -42,7 +58,7 @@ pub struct FaceMatchRequestAuth {
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
-/// A single ZKPassport proof, matching the `ProofResult` type from `@zkpassport/utils`.
+/// A single zkPassport proof, matching the `ProofResult` type from `@zkpassport/utils`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ZKPassportProofResult {
@@ -88,6 +104,7 @@ pub enum AuthErrorKind {
     Internal,
 }
 
+/// Numeric close-frame error codes sent to the client when [`AuthErrorKind`] occurs.
 pub mod error_codes {
     /// Error code for [`super::AuthErrorKind::OracleNotReachable`].
     pub const ORACLE_NOT_REACHABLE: u16 = 4500;

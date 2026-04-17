@@ -67,7 +67,7 @@ start_node() {
     local db_conn="postgres://postgres:postgres@localhost:5432/postgres"
     RUST_LOG="taceo=trace,warn" \
     TACEO_OPRF_NODE__BIND_ADDR=0.0.0.0:$port \
-    TACEO_OPRF_NODE__SERVICE__ORACLE_URL="http://127.0.0.1:3000" \
+    TACEO_OPRF_NODE__SERVICE__ORACLE_URL="http://127.0.0.1:8080" \
     TACEO_OPRF_NODE__SERVICE__OPRF__ENVIRONMENT=dev \
     TACEO_OPRF_NODE__SERVICE__OPRF__OPRF_KEY_REGISTRY_CONTRACT=$oprf_key_registry \
     TACEO_OPRF_NODE__SERVICE__OPRF__VERSION_REQ=">=0.0.0" \
@@ -149,10 +149,12 @@ setup() {
     wait_for_health 20001 "oprf-key-gen1" 300
     wait_for_health 20002 "oprf-key-gen2" 300
 
+    echo -e "${GREEN}starting proof-verifier (oracle)..${NOCOLOR}"
+    docker compose -f ./deploy/local/docker-compose.yml up -d proof-verifier
+    docker compose -f ./deploy/local/docker-compose.yml logs -f --no-log-prefix proof-verifier > logs/proof-verifier.log 2>&1 &
+    wait_for_health 8080 "proof-verifier" 60
+
     echo -e "${GREEN}starting OPRF nodes..${NOCOLOR}"
-    echo -e "${GREEN}starting mock-oracle..${NOCOLOR}"
-    start_mock_oracle
-    wait_for_mock_oracle 3000 30
     start_node 0
     start_node 1
     start_node 2

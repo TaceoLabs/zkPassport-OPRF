@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use ark_serialize::CanonicalSerialize;
 use eyre::Context as _;
 use reqwest::{ClientBuilder, StatusCode, Url};
@@ -16,7 +18,7 @@ use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth, ZKPass
 #[derive(Debug, Clone, Serialize)]
 pub struct OracleVerifyRequest {
     #[serde(serialize_with = "serialize_point_to_hex")]
-    /// The blinded unique identifier (BabyJubJub affine point), hex-encoded as `"0x<x><y>"`.
+    /// The blinded unique identifier (`BabyJubJub` affine point), hex-encoded as `"0x<x><y>"`.
     blinded_unique_identifier: ark_babyjubjub::EdwardsAffine,
     /// The zkPassport proofs submitted by the client.
     proofs: Vec<ZKPassportProofResult>,
@@ -168,7 +170,7 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
     }
 }
 
-/// Serialize a BabyJubJub affine point to a `"0x<x><y>"` hex string.
+/// Serialize a `BabyJubJub` affine point to a `"0x<x><y>"` hex string.
 ///
 /// Coordinates are serialized in big-endian byte order to match the circuit's
 /// public output format. `ark-serialize` returns little-endian bytes, so both
@@ -194,13 +196,14 @@ fn serialize_point_to_hex<S: Serializer>(
         .map_err(S::Error::custom)?;
     y_bytes.reverse();
 
-    let hex_x = x_bytes
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect::<String>();
-    let hex_y = y_bytes
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect::<String>();
+    let mut hex_x = String::with_capacity(x_bytes.len() * 2);
+    for b in &x_bytes {
+        write!(&mut hex_x, "{b:02x}").expect("Write to a string should never panic");
+    }
+
+    let mut hex_y = String::with_capacity(y_bytes.len() * 2);
+    for b in &y_bytes {
+        write!(&mut hex_y, "{b:02x}").expect("Write to a string should never panic");
+    }
     ser.serialize_str(&format!("0x{hex_x}{hex_y}"))
 }

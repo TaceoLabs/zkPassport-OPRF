@@ -62,6 +62,7 @@ taceo-nodes-common = { version = "0.4.4", default-features = false }
 taceo-nodes-observability = { version = "0.1" }
 taceo-oprf = { package = "taceo-oprf", version = "0.12.1" }
 thiserror = { version = "2" }
+tikv-jemallocator = "0.6"
 tokio = { version = "1" }
 tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 tokio-util = "0.7"
@@ -71,6 +72,10 @@ tracing-subscriber = { version = "0.3" }
 uuid = { version = "1" }
 webpki-roots = { version = "1.0" }
 zeroize = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
 
 # This profile can be used for CI in pull requests.
 [profile.ci-dev]

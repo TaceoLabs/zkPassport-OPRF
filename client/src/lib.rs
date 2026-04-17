@@ -1,3 +1,19 @@
+#![deny(missing_docs)]
+#![deny(clippy::all, clippy::pedantic)]
+#![deny(
+    clippy::allow_attributes_without_reason,
+    clippy::assertions_on_result_states,
+    clippy::dbg_macro,
+    clippy::decimal_literal_representation,
+    clippy::iter_over_hash_type,
+    clippy::let_underscore_must_use,
+    clippy::missing_assert_message,
+    clippy::print_stderr,
+    clippy::print_stdout,
+    clippy::undocumented_unsafe_blocks,
+    clippy::unnecessary_safety_comment,
+    clippy::unwrap_used
+)]
 //! Client library for zkPassport's instance of TACEO:OPRF.
 //!
 //! This crate wraps the upstream [`taceo_oprf::client`] functionality and
@@ -37,8 +53,8 @@ const ZKPASSPORT_OPRF_DS: &[u8] = b"TACEO zkPassport OPRF Auth";
 /// - `threshold` — minimum number of nodes required to reconstruct the output
 /// - `oprf_key_id` — identifier of the OPRF key registered on-chain
 /// - `proofs` — zkPassport proof results to include in the authentication payload
-/// - `private_nullifier` — the client's private nullifier (BabyJubJub base field element)
-/// - `beta` — pre-chosen blinding scalar (BabyJubJub scalar field element)
+/// - `private_nullifier` — the client's private nullifier (`BabyJubJub` base field element)
+/// - `beta` — pre-chosen blinding scalar (`BabyJubJub` scalar field element)
 /// - `connector` — TLS / transport connector used for the WebSocket connection
 ///
 /// # Errors

@@ -1,0 +1,5 @@
+target/
+.github/
+docs/
+logs/
+contracts/

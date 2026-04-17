@@ -1,0 +1,24 @@
+name: Build and Push (zkPassport OPRF-node)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'zkpassport-oprf-node-v*'
+
+jobs:
+  workflow:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/build-and-push.yml
+    with:
+      image-name: zkpassport-oprf-node
+      dockerfile: build/Dockerfile.zkpassport.node
+    secrets:
+      AWS_ARCHIVE_ROLE: ${{ secrets.AWS_ARCHIVE_ROLE }}
+      AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+

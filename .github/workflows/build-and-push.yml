@@ -130,9 +130,10 @@ jobs:
           GRYPE_FILE: vuln-report.out
 
       - name: Summarize vulnerability report
+        if: always()
         run: |
           VULN_REPORT="$(cat vuln-report.out)"
-          printf "# Vulnerability Report Summary\n<pre>$VULN_REPORT</pre>" > $GITHUB_STEP_SUMMARY
+          printf '%s' "# Vulnerability Report Summary\n<pre>${VULN_REPORT}</pre>" > $GITHUB_STEP_SUMMARY
 
       - name: Push image tags
         id: push-image

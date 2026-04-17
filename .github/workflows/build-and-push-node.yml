@@ -3,8 +3,6 @@ name: Build and Push (zkPassport OPRF-node)
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
     tags:
       - 'zkpassport-oprf-node-v*'
 

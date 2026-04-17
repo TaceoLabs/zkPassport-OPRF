@@ -1,4 +1,12 @@
 services:
+  proof-verifier:
+    image: ${PROOF_VERIFIER_IMAGE:-europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier:temp-local-registry}
+    container_name: proof-verifier
+    network_mode: "host"
+    environment:
+      PORT: 8080
+      HOST: 0.0.0.0
+
   anvil:
     image: ghcr.io/foundry-rs/foundry:latest
     container_name: anvil

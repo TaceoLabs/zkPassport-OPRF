@@ -10,7 +10,6 @@ This is a monorepo containing:
 * `client`: A library crate implementing the client-side logic for performing a distributed, verifiable OPRF evaluation with zkPassport authentication.
 * `contracts`: Foundry project containing the smart contracts (inherited from the upstream OPRF service).
 * `dev-client`: A binary crate providing a development/testing client that exercises the full OPRF + authentication flow using fixture data.
-* `mock-oracle`: A binary crate implementing a lightweight Axum server that always returns `verified: true`, used for local development.
 * `node`: A binary + library crate implementing the zkPassport OPRF node — the main service binary that handles OPRF requests with face-match authentication.
 
 ## Dev Dependencies
@@ -62,7 +61,7 @@ This will:
 1. Start `anvil` and `postgres` Docker containers
 2. Deploy the `OprfKeyRegistry` smart contract and register participants
 3. Start 3 OPRF key-gen instances (via Docker)
-4. Start a mock oracle and 3 OPRF service nodes
+4. Start an verification oracle and 3 OPRF service nodes
 5. Initialize an OPRF key
 
 Log files for all processes are written to the `logs/` directory. Press `Ctrl+C` to tear down.
@@ -78,7 +77,6 @@ just run-dev-client test
 The OPRF node is configured via environment variables using a hierarchical prefix scheme:
 
 * **OPRF node:** `TACEO_OPRF_NODE__*` (e.g., `TACEO_OPRF_NODE__BIND_ADDR`, `TACEO_OPRF_NODE__SERVICE__OPRF__ENVIRONMENT`)
-* **Mock oracle:** `MOCK_ORACLE_BIND_ADDR`
 
 OPRF key-gen instances are provided by the upstream [oprf-service](https://github.com/TaceoLabs/oprf-service) Docker images and configured via `TACEO_OPRF_KEY_GEN__*` environment variables.
 

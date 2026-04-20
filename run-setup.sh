@@ -85,32 +85,25 @@ start_node() {
 teardown() {
     docker compose -f ./deploy/local/docker-compose.yml down || true
     killall -9 taceo-zkpassport-oprf-node 2>/dev/null || true
-    killall -9 taceo-zkpassport-oprf-mock-oracle 2>/dev/null || true
     killall -9 anvil 2>/dev/null || true
 }
 
-start_mock_oracle() {
-    MOCK_ORACLE_BIND_ADDR=0.0.0.0:3000 \
-    ./target/debug/taceo-zkpassport-oprf-mock-oracle > logs/mock-oracle.log 2>&1 &
-    pid=$!
-    echo "started mock-oracle with PID $pid"
-}
 
-wait_for_mock_oracle() {
+wait_for_proof_verifier() {
     local port=$1
     local timeout=${2:-30}
     local start_time=$(date +%s)
-    echo "waiting for mock-oracle on port $port to be healthy..."
+    echo "waiting for proof-verifier on port $port to be healthy..."
 
     while true; do
-        http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$port/" || echo "000")
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$port/health" || echo "000")
         if [[ "$http_code" == "200" ]]; then
             echo "mock-oracle is healthy!"
             break
         fi
         now=$(date +%s)
         if (( now - start_time >= timeout )); then
-            echo -e "${RED}error: mock-oracle did not become healthy after $timeout seconds${NOCOLOR}" >&2
+            echo -e "${RED}error: proof-verifier did not become healthy after $timeout seconds${NOCOLOR}" >&2
             exit 1
         fi
         sleep 1
@@ -123,7 +116,8 @@ setup() {
     teardown
     trap teardown EXIT SIGINT SIGTERM
 
-    docker compose -f ./deploy/local/docker-compose.yml up -d postgres anvil
+    docker compose -f ./deploy/local/docker-compose.yml up -d postgres anvil proof-verifier
+
     # wait for anvil to be healthy before proceeding
     while true; do
         response=$(curl -X POST --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' -H "Content-Type: application/json" http://localhost:8545 || echo "bla")
@@ -134,9 +128,10 @@ setup() {
         echo "Waiting for Anvil to be healthy..."
         sleep 1
     done
-
     echo -e "${GREEN}deploying contracts..${NOCOLOR}"
     deploy_contracts
+
+    wait_for_health 8080 "proof-verifier" 300
 
     echo -e "${GREEN}starting OPRF key-gen nodes..${NOCOLOR}"
     TACEO_OPRF_KEY_GEN__SERVICE__OPRF_KEY_REGISTRY_CONTRACT=$oprf_key_registry \

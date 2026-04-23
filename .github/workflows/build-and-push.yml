@@ -126,14 +126,17 @@ jobs:
           fail-build: true
           output-format: table
           severity-cutoff: critical
-        env:
-          GRYPE_FILE: vuln-report.out
+          output-file: vuln-report.out
 
       - name: Summarize vulnerability report
         if: always()
         run: |
-          VULN_REPORT="$(cat vuln-report.out)"
-          printf '%s/n%s' "# Vulnerability Report Summary<pre>${VULN_REPORT}</pre>" > $GITHUB_STEP_SUMMARY
+          {
+            echo "# Vulnerability Report Summary"
+            echo '```'
+            cat vuln-report.out
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Push image tags
         id: push-image

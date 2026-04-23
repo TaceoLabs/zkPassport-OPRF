@@ -89,27 +89,6 @@ teardown() {
 }
 
 
-wait_for_proof_verifier() {
-    local port=$1
-    local timeout=${2:-30}
-    local start_time=$(date +%s)
-    echo "waiting for proof-verifier on port $port to be healthy..."
-
-    while true; do
-        http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$port/health" || echo "000")
-        if [[ "$http_code" == "200" ]]; then
-            echo "mock-oracle is healthy!"
-            break
-        fi
-        now=$(date +%s)
-        if (( now - start_time >= timeout )); then
-            echo -e "${RED}error: proof-verifier did not become healthy after $timeout seconds${NOCOLOR}" >&2
-            exit 1
-        fi
-        sleep 1
-    done
-}
-
 setup() {
     rm -rf logs
     mkdir -p logs

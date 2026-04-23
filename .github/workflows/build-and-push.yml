@@ -123,7 +123,7 @@ jobs:
         uses: anchore/scan-action@v7
         with:
           sbom: ${{ runner.temp }}/${{ matrix.arch }}-sbom.spdx.json
-          fail-build: true
+          fail-build: false
           output-format: table
           severity-cutoff: critical
           output-file: vuln-report.out

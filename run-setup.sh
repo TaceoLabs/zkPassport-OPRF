@@ -84,6 +84,8 @@ start_node() {
 
 teardown() {
     docker compose -f ./deploy/local/docker-compose.yml down || true
+    cat logs/node0.log || true
+    cat logs/proof-verifier.log || true
     killall -9 taceo-zkpassport-oprf-node 2>/dev/null || true
     killall -9 anvil 2>/dev/null || true
 }

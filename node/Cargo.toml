@@ -24,7 +24,7 @@ metrics = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-taceo-nodes-common = { workspace = true, features = ["alloy", "postgres"] }
+taceo-nodes-common = { workspace = true, features = ["postgres", "web3"] }
 taceo-nodes-observability = { workspace = true }
 taceo-oprf = { workspace = true, features = ["service"] }
 thiserror.workspace = true

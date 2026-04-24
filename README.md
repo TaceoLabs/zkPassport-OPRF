@@ -1,4 +1,4 @@
-[![CI](https://github.com/TaceoLabs/zkpassport-OPRF/actions/workflows/rust_test.yml/badge.svg)](https://github.com/TaceoLabs/zkpassport-OPRF/actions/workflows/rust_test.yml) [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](/LICENSE) [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
+[![CI](https://github.com/TaceoLabs/zkpassport-OPRF/actions/workflows/rust_test.yml/badge.svg)](https://github.com/TaceoLabs/zkPassport-OPRF/actions/workflows/rust_test.yml) [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](/LICENSE) [![Rust](https://img.shields.io/badge/rust-1.91%2B-orange.svg)](https://www.rust-lang.org)
 
 # TACEO:OPRF for zkPassport
 
@@ -17,7 +17,7 @@ This is a monorepo containing:
 * [just](https://github.com/casey/just)
 * Docker Compose (for running `anvil` and `postgres` containers)
 * anvil and forge — install with [foundryup](https://getfoundry.sh/introduction/installation/)
-* Rust 1.88+ (edition 2024)
+* Rust 1.91+ (edition 2024)
 
 ## Setup
 
@@ -81,6 +81,8 @@ The OPRF node is configured via environment variables using a hierarchical prefi
 OPRF key-gen instances are provided by the upstream [oprf-service](https://github.com/TaceoLabs/oprf-service) Docker images and configured via `TACEO_OPRF_KEY_GEN__*` environment variables.
 
 See `run-setup.sh` for a complete example of all required environment variables.
+
+For node RPC configuration, the HTTP URLs remain under `TACEO_OPRF_NODE__SERVICE__RPC__HTTP_URLS`, while the websocket endpoint used for subscriptions is now configured via `TACEO_OPRF_NODE__SERVICE__OPRF__WS_RPC_URL`.
 
 ## Secret Management
 

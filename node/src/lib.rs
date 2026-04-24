@@ -67,10 +67,9 @@ pub async fn start(
 
     tracing::info!("connecting to RPC..");
     let rpc_provider =
-        taceo_nodes_common::web3::RpcProviderBuilder::with_config(&config.rpc_provider_config)
+        taceo_nodes_common::web3::HttpRpcProviderBuilder::with_config(&config.rpc_provider_config)
             .environment(node_config.environment)
             .build()
-            .await
             .context("while init blockchain connection")?;
 
     tracing::info!("init oprf request auth service..");

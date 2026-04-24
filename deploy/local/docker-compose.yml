@@ -2,7 +2,8 @@ services:
   proof-verifier:
     image: ${PROOF_VERIFIER_IMAGE:-europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier:temp-local-registry}
     container_name: proof-verifier
-    network_mode: "host"
+    ports:
+      - "8080:8080"
     environment:
       PORT: 8080
       HOST: 0.0.0.0

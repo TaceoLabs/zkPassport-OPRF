@@ -90,14 +90,14 @@ impl FaceMatchAuthenticator {
     /// # Errors
     /// Returns an error if the HTTP client cannot be built or the oracle does not
     /// respond with `200 OK`.
-    pub async fn init(oracle_url: Url) -> eyre::Result<Self> {
+    pub async fn init(health_check_url: Url, verifier_url: Url) -> eyre::Result<Self> {
         // we use the client-builder to avoid panic if we cannot install tls backend
         let client = ClientBuilder::new()
             .build()
             .context("while building reqwest client")?;
-        tracing::info!("pinging oracle at: {oracle_url}");
+        tracing::info!("pinging oracle health check at: {health_check_url}");
         let response = client
-            .get(oracle_url.clone())
+            .get(health_check_url.clone())
             .send()
             .await
             .context("while trying to reach oracle")?;
@@ -110,9 +110,7 @@ impl FaceMatchAuthenticator {
         }
         Ok(Self {
             client,
-            verify_url: oracle_url
-                .join("oprf/verify")
-                .context("while building oracle-url")?,
+            verify_url: verifier_url,
         })
     }
 

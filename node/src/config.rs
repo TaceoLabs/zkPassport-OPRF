@@ -12,8 +12,11 @@ use taceo_oprf::service::{VersionReq, config::OprfNodeServiceConfig};
 #[derive(Clone, Debug, Deserialize)]
 #[non_exhaustive]
 pub struct ZkPassportNodeConfig {
+    /// The `URL` of the oracle health check endpoint.
+    pub oracle_health_check_url: Url,
+
     /// The `URL` of the oracle verifying the face-match proofs.
-    pub oracle_url: Url,
+    pub oracle_verifier_url: Url,
 
     /// The OPRF service config
     #[serde(rename = "oprf")]
@@ -33,14 +36,16 @@ impl ZkPassportNodeConfig {
     )]
     pub fn with_default_values(
         environment: taceo_oprf::service::Environment,
-        proof_oracle_url: Url,
+        oracle_health_check_url: Url,
+        oracle_verifier_url: Url,
         oprf_key_registry_contract: Address,
         ws_rpc_url: Url,
         version_req: VersionReq,
         rpc_provider_config: HttpRpcProviderConfig,
     ) -> Self {
         Self {
-            oracle_url: proof_oracle_url,
+            oracle_health_check_url,
+            oracle_verifier_url,
             node_config: OprfNodeServiceConfig::with_default_values(
                 environment,
                 oprf_key_registry_contract,

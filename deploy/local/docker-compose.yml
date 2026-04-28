@@ -1,6 +1,6 @@
 services:
   proof-verifier:
-    image: ${PROOF_VERIFIER_IMAGE:-europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier:temp-local-registry}
+    image: ${PROOF_VERIFIER_IMAGE:-europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier:672beecec8a1f7f451e9d6852c8e06681a8f347b}
     container_name: proof-verifier
     ports:
       - "8080:8080"

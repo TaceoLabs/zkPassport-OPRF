@@ -51,7 +51,7 @@ parking_lot = "0.12"
 poseidon2 = { package = "taceo-poseidon2", version = "0.2", default-features = false }
 rand = { version = "0.8" }
 rand_chacha = { version = "0.3" }
-reqwest = { version = "0.12", default-features = false }
+reqwest = { version = "0.13", default-features = false }
 rustls = "0.23"
 secrecy = "0.10"
 semver = "1"

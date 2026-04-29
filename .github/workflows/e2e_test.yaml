@@ -34,7 +34,4 @@ jobs:
       - run: cd contracts && forge install && forge build
       - uses: Swatinem/rust-cache@v2
       - name: Run E2E Test
-        # run: bash run-setup.sh e2e-test
-        # TODO the local docker image for the proof-verifier doesn't work in the CI
-        # wait for feedback 
-        run: ls
+        run: bash run-setup.sh e2e-test

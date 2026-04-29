@@ -33,10 +33,5 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
       - run: cd contracts && forge install && forge build
       - uses: Swatinem/rust-cache@v2
-      - name: Install Barretenberg (bb)
-        run: |
-          curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/next/barretenberg/bbup/install | bash
-          echo "${HOME}/.bb" >> $GITHUB_PATH
-          ${HOME}/.bb/bbup -nv 1.0.0-beta.19
       - name: Run E2E Test
         run: bash run-setup.sh e2e-test

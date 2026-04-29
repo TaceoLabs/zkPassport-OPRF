@@ -67,7 +67,8 @@ start_node() {
     local db_conn="postgres://postgres:postgres@localhost:5432/postgres"
     RUST_LOG="taceo=trace,warn" \
     TACEO_OPRF_NODE__BIND_ADDR=0.0.0.0:$port \
-    TACEO_OPRF_NODE__SERVICE__ORACLE_URL="http://127.0.0.1:8080" \
+    TACEO_OPRF_NODE__SERVICE__ORACLE_HEALTH_CHECK_URL="http://127.0.0.1:8080" \
+    TACEO_OPRF_NODE__SERVICE__ORACLE_VERIFIER_URL="http://127.0.0.1:8080/verify-oprf-auth?devmode=true" \
     TACEO_OPRF_NODE__SERVICE__OPRF__ENVIRONMENT=dev \
     TACEO_OPRF_NODE__SERVICE__OPRF__OPRF_KEY_REGISTRY_CONTRACT=$oprf_key_registry \
     TACEO_OPRF_NODE__SERVICE__OPRF__VERSION_REQ=">=0.0.0" \

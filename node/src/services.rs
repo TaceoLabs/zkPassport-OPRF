@@ -16,7 +16,7 @@ use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth, ZKPass
 
 /// Request body sent to the oracle's proof-verification endpoint (`POST /oprf/verify`).
 #[derive(Debug, Clone, Serialize)]
-pub struct OracleVerifyRequest {
+struct OracleVerifyRequest {
     #[serde(serialize_with = "serialize_point_to_hex")]
     /// The blinded unique identifier (`BabyJubJub` affine point), hex-encoded as `"0x<x><y>"`.
     blinded_unique_identifier: ark_babyjubjub::EdwardsAffine,
@@ -26,7 +26,7 @@ pub struct OracleVerifyRequest {
 
 /// Response body received from the oracle's verification endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OracleVerifyResponse {
+struct OracleVerifyResponse {
     /// Whether the oracle accepted the proofs.
     verified: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -63,7 +63,7 @@ impl FaceMatchAuthError {
     ///
     /// [`Internal`](Self::Internal) errors are logged at `error` level with a full
     /// report chain; all other variants are logged at `debug` level.
-    pub fn log(&self) {
+    pub(crate) fn log(&self) {
         if let Self::Internal(report) = self {
             tracing::error!("{report:?}");
         } else {

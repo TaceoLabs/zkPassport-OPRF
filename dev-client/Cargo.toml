@@ -18,10 +18,8 @@ ark-ff.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 eyre.workspace = true
 rand.workspace = true
-rand_chacha.workspace = true
 rustls.workspace = true
 serde_json.workspace = true
-taceo-nodes-observability.workspace = true
 taceo-oprf = { workspace = true, features = ["dev-client"] }
 tokio = { workspace = true, features = [
   "net",
@@ -32,6 +30,10 @@ tokio = { workspace = true, features = [
   "tokio-macros",
 ] }
 tracing.workspace = true
+tracing-subscriber = {workspace = true, features = [
+  "env-filter",
+  "fmt",
+]}
 uuid = { workspace = true, features = ["serde", "v4"] }
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
 zkpassport-oprf-client = { package = "taceo-zkpassport-oprf-client", path = "../client", version = "0.1" }

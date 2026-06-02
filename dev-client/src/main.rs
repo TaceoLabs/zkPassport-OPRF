@@ -27,6 +27,7 @@ use taceo_oprf::{
         OprfKeyId, ShareEpoch, api::OprfRequest, async_trait::async_trait, crypto::OprfPublicKey,
     },
 };
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _};
 use uuid::Uuid;
 use zkpassport_oprf_authentication::{AuthModules, FaceMatchRequestAuth, ZKPassportProofResult};
 
@@ -96,9 +97,21 @@ struct FaceMatchDevClientSetup {
     oprf_public_key: OprfPublicKey,
 }
 
+fn install_tracing(env_filter: &str) {
+    let fmt_layer = fmt::layer().compact();
+    let filter_layer = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new(env_filter))
+        .unwrap();
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt_layer)
+        .init();
+}
+
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    taceo_nodes_observability::install_tracing("taceo=trace,warn");
+    install_tracing("taceo=trace,warn");
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .expect("can install");

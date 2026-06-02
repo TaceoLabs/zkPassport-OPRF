@@ -82,8 +82,6 @@ OPRF key-gen instances are provided by the upstream [oprf-service](https://githu
 
 See `run-setup.sh` for a complete example of all required environment variables.
 
-For node RPC configuration, the HTTP URLs remain under `TACEO_OPRF_NODE__SERVICE__RPC__HTTP_URLS`, while the websocket endpoint used for subscriptions is now configured via `TACEO_OPRF_NODE__SERVICE__OPRF__WS_RPC_URL`.
-
 ## Secret Management
 
 OPRF key shares are stored in a PostgreSQL database, managed by the upstream `taceo-oprf` secret manager.

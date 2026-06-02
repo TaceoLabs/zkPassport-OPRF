@@ -15,6 +15,5 @@ publish.workspace = true
 ark-babyjubjub.workspace = true
 ark-ff.workspace = true
 eyre.workspace = true
-rand.workspace = true
 taceo-oprf = { workspace = true, features = ["client", "core"] }
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }

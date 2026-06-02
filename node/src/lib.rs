@@ -18,21 +18,18 @@
 //!
 //! This crate provides the [`start`] function, which:
 //!
-//! 1. Connects to the blockchain via the configured RPC provider.
-//! 2. Initializes the `FaceMatchAuthenticator`
+//! 1. Initializes the `FaceMatchAuthenticator`
 //!    that verifies zkPassport proofs through an oracle.
-//! 3. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
+//! 2. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
 //!    and registers the face-match authentication module.
 //!
-//! The returned Axum router and background task handle are consumed by
-//! the binary in `main.rs`.
+//! The returned Axum router is consumed by the binary in `main.rs`.
 
 use std::sync::Arc;
 
 use eyre::Context;
 use taceo_oprf::service::{StartedServices, secret_manager::SecretManagerService};
 use tokio_util::sync::CancellationToken;
-use tower_http::cors::CorsLayer;
 use zkpassport_oprf_authentication::AuthModules;
 
 use crate::{config::ZkPassportNodeConfig, services::FaceMatchAuthenticator};
@@ -44,33 +41,23 @@ pub(crate) mod services;
 /// Initialize and wire the zkPassport OPRF service.
 ///
 /// # Parameters
-/// - `config` — node configuration (oracle URL, OPRF service config, RPC config)
+/// - `config` — node configuration (oracle URLs, OPRF service config)
 /// - `secret_manager` — back-end for loading and storing OPRF key shares
 /// - `cancellation_token` — signals all background tasks to shut down
 ///
 /// # Returns
-/// A tuple of:
-/// - The Axum [`Router`](axum::Router) to be served by the HTTP listener
-/// - A [`JoinHandle`](tokio::task::JoinHandle) for the background OPRF node tasks
+/// The Axum [`Router`](axum::Router) to be served by the HTTP listener.
 ///
 /// # Errors
-/// Returns an error if the RPC connection fails, the oracle health-check fails,
-/// or the OPRF service cannot initialize.
+/// Returns an error if the oracle health-check fails or the OPRF service cannot initialize.
 pub async fn start(
     config: ZkPassportNodeConfig,
     secret_manager: SecretManagerService,
     cancellation_token: CancellationToken,
-) -> eyre::Result<(axum::Router, tokio::task::JoinHandle<eyre::Result<()>>)> {
+) -> eyre::Result<axum::Router> {
     tracing::info!("starting oprf-service with config: {config:#?}");
     let node_config = config.node_config;
     let started_services = StartedServices::default();
-
-    tracing::info!("connecting to RPC..");
-    let rpc_provider =
-        taceo_nodes_common::web3::HttpRpcProviderBuilder::with_config(&config.rpc_provider_config)
-            .environment(node_config.environment)
-            .build()
-            .context("while init blockchain connection")?;
 
     tracing::info!("init oprf request auth service..");
     let oprf_req_auth_service = Arc::new(
@@ -80,20 +67,19 @@ pub async fn start(
     );
 
     tracing::info!("init oprf service..");
-    let (router, tasks) = taceo_oprf::service::OprfServiceBuilder::init(
+    let router = taceo_oprf::service::OprfServiceBuilder::init(
         node_config,
         secret_manager,
-        rpc_provider,
         started_services.clone(),
         cancellation_token.clone(),
     )
     .await?
+    .cors_for_info()
     .module(
         &format!("/{}", AuthModules::FaceMatch),
         oprf_req_auth_service,
     )
     .build();
 
-    let router = router.layer(CorsLayer::permissive());
-    Ok((router, tasks))
+    Ok(router)
 }

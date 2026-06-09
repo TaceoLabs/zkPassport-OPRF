@@ -5520,6 +5520,7 @@ dependencies = [
  "reqwest 0.13.3",
  "rustls",
  "serde",
+ "serde_json",
  "taceo-nodes-common",
  "taceo-oprf",
  "taceo-zkpassport-oprf-authentication",

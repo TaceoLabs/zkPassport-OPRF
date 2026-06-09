@@ -20,6 +20,7 @@ metrics = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 taceo-nodes-common = { workspace = true, features = ["postgres"] }
 taceo-oprf = { workspace = true, features = ["service"] }
 telemetry-batteries = { workspace = true, features = ["metrics-statsd"] }

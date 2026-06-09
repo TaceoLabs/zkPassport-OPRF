@@ -64,10 +64,16 @@ impl FaceMatchAuthError {
     /// [`Internal`](Self::Internal) errors are logged at `error` level with a full
     /// report chain; all other variants are logged at `debug` level.
     pub(crate) fn log(&self) {
-        if let Self::Internal(report) = self {
-            tracing::error!("{report:?}");
-        } else {
-            tracing::debug!("{self}");
+        match self {
+            FaceMatchAuthError::OracleNotReachable(_) => {
+                tracing::warn!(err=?self,"oracle not reachable: {self}");
+            }
+            FaceMatchAuthError::OracleVerificationFailed(_) => {
+                tracing::warn!(auth_error = true, err=?self, "{self}");
+            }
+            FaceMatchAuthError::Internal(report) => {
+                tracing::error!(err=?report, "Internal Server Error");
+            }
         }
     }
 }
@@ -135,9 +141,15 @@ impl FaceMatchAuthenticator {
             .send()
             .await?;
 
-        let oracle_response: OracleVerifyResponse = response
-            .json()
+        let response = response
+            .text()
             .await
+            .context("while fetching response from oracle")?;
+
+        let oracle_response = serde_json::from_str::<OracleVerifyResponse>(&response)
+            .inspect_err(|err| {
+                tracing::error!(%response, %err, "could not parse response from oracle");
+            })
             .context("while parsing oracle response")?;
 
         if !oracle_response.verified {

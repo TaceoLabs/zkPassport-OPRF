@@ -12,6 +12,7 @@ use taceo_oprf::types::{
     ark_babyjubjub,
     async_trait::async_trait,
 };
+use tracing::instrument;
 use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth, ZKPassportProofResult};
 
 /// Request body sent to the oracle's proof-verification endpoint (`POST /oprf/verify`).
@@ -168,6 +169,7 @@ impl FaceMatchAuthenticator {
 impl OprfRequestAuthenticator for FaceMatchAuthenticator {
     type RequestAuth = FaceMatchRequestAuth;
 
+    #[instrument(level = "info", skip_all)]
     async fn authenticate(
         &self,
         request: &OprfRequest<Self::RequestAuth>,

@@ -16,6 +16,8 @@ COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --locked --recipe-path recipe.json
 # Build application
 COPY . .
+ARG GIT_HASH
+ENV GIT_HASH=$GIT_HASH
 RUN cargo build --release --locked --bin taceo-zkpassport-oprf-node
 
 # Build healthcheck

@@ -5353,9 +5353,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-nodes-common"
-version = "0.7.2"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dea5505990bca89790cece6b15dc7b317963d9725a722186a8756cd568b50b5"
+checksum = "15af1a54071def0649b8e55c8d87afff9cd537565345e939264313aeb7031fc1"
 dependencies = [
  "alloy",
  "axum",
@@ -5657,7 +5657,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -6499,7 +6499,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

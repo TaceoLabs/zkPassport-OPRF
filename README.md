@@ -1,4 +1,4 @@
-[![CI](https://github.com/TaceoLabs/zkpassport-OPRF/actions/workflows/rust_test.yml/badge.svg)](https://github.com/TaceoLabs/zkPassport-OPRF/actions/workflows/rust_test.yml) [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](/LICENSE) [![Rust](https://img.shields.io/badge/rust-1.91%2B-orange.svg)](https://www.rust-lang.org)
+[![CI](https://github.com/TaceoLabs/zkPassport-OPRF/actions/workflows/ci.yml/badge.svg)](https://github.com/TaceoLabs/zkPassport-OPRF/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](/LICENSE) [![Rust](https://img.shields.io/badge/rust-1.91%2B-orange.svg)](https://www.rust-lang.org)
 
 # TACEO:OPRF for zkPassport
 
@@ -61,7 +61,7 @@ This will:
 1. Start `anvil` and `postgres` Docker containers
 2. Deploy the `OprfKeyRegistry` smart contract and register participants
 3. Start 3 OPRF key-gen instances (via Docker)
-4. Start an verification oracle and 3 OPRF service nodes
+4. Start a verification oracle (proof-verifier) and 3 OPRF service nodes
 5. Initialize an OPRF key
 
 Log files for all processes are written to the `logs/` directory. Press `Ctrl+C` to tear down.
@@ -81,6 +81,23 @@ The OPRF node is configured via environment variables using a hierarchical prefi
 OPRF key-gen instances are provided by the upstream [oprf-service](https://github.com/TaceoLabs/oprf-service) Docker images and configured via `TACEO_OPRF_KEY_GEN__*` environment variables.
 
 See `run-setup.sh` for a complete example of all required environment variables.
+
+### Oracle Health Check
+
+At startup the node spawns a background task that **polls the proof-verifier oracle**
+on a fixed interval and logs the result. This is an outbound check — the node itself
+exposes no `/health` endpoint.
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `TACEO_OPRF_NODE__SERVICE__ORACLE_HEALTH_CHECK_URL` | yes | — | URL of the oracle's health endpoint (e.g. `http://127.0.0.1:8080`) |
+| `TACEO_OPRF_NODE__SERVICE__ORACLE_HEALTH_CHECK_INTERVAL` | no | `5m` | Poll interval in [humantime](https://docs.rs/humantime) format (e.g. `30s`, `2m`) |
+
+Each poll logs one of three outcomes via `tracing`:
+
+* **HTTP 200** — `INFO oracle healthy`
+* **Connection error** — `ERROR cannot reach oracle health url`
+* **Non-200 response** — `ERROR oracle health check returned non-200 status` with status code and response body
 
 ## Secret Management
 
@@ -111,3 +128,6 @@ This project is licensed under either of
 * [MIT License](http://opensource.org/licenses/MIT)
 
 at your option.
+
+> **Note:** `LICENSE-APACHE` and `LICENSE-MIT` files are not yet present in the
+> repository root. They should be added to match the declared dual-license.

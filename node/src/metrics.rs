@@ -15,13 +15,21 @@ pub fn describe_metrics() {
 pub(crate) mod oracle {
 
     /// Metrics placeholder
-    const METRICS_ID_ORACLE_HEALTH: &str = "taceo.zkpassport.nullifier.oprf.health";
+    const METRICS_ID_ORACLE_HEALTH: &str = "taceo.zkpassport.oracle.health";
 
     pub(crate) fn describe_metrics() {
-        metrics::describe_counter!(
+        metrics::describe_gauge!(
             METRICS_ID_ORACLE_HEALTH,
             metrics::Unit::Count,
-            "Placeholder metric for oracle health"
+            "Gauge that is either 0 or 1, indicting whether the oracle is healthy"
         );
+    }
+
+    pub(crate) fn healthy() {
+        metrics::gauge!(METRICS_ID_ORACLE_HEALTH).set(1.0);
+    }
+
+    pub(crate) fn sick() {
+        metrics::gauge!(METRICS_ID_ORACLE_HEALTH).set(0.0);
     }
 }

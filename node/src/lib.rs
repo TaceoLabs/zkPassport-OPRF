@@ -18,9 +18,11 @@
 //!
 //! This crate provides the [`start`] function, which:
 //!
-//! 1. Initializes the `FaceMatchAuthenticator`
+//! 1. Spawns a background oracle health-check task that periodically polls
+//!    the oracle's health endpoint and logs the result (see `services::health_check`).
+//! 2. Initializes the `FaceMatchAuthenticator`
 //!    that verifies zkPassport proofs through an oracle.
-//! 2. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
+//! 3. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
 //!    and registers the face-match authentication module.
 //!
 //! The returned Axum router is consumed by the binary in `main.rs`.
@@ -55,7 +57,9 @@ pub(crate) mod services;
 /// The Axum [`Router`](axum::Router) to be served by the HTTP listener.
 ///
 /// # Errors
-/// Returns an error if the oracle health-check fails or the OPRF service cannot initialize.
+/// Returns an error if the `FaceMatchAuthenticator` fails to initialize or the OPRF service
+/// cannot be set up. The oracle health-check task is spawned detached and only logs its results
+/// — it does not affect the return value of this function.
 pub fn start(
     config: ZkPassportNodeConfig,
     secret_manager: SecretManagerService,

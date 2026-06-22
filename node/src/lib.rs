@@ -28,7 +28,10 @@
 use std::sync::Arc;
 
 use eyre::Context;
-use taceo_oprf::service::{StartedServices, secret_manager::SecretManagerService};
+use taceo_oprf::{
+    service::{StartedServices, secret_manager::SecretManagerService},
+    types::service::NodeInformation,
+};
 use tokio_util::sync::CancellationToken;
 use zkpassport_oprf_authentication::AuthModules;
 
@@ -53,6 +56,7 @@ pub(crate) mod services;
 pub async fn start(
     config: ZkPassportNodeConfig,
     secret_manager: SecretManagerService,
+    node_information: NodeInformation,
     cancellation_token: CancellationToken,
 ) -> eyre::Result<axum::Router> {
     tracing::info!("starting oprf-service with config: {config:#?}");
@@ -71,9 +75,9 @@ pub async fn start(
         node_config,
         secret_manager,
         started_services.clone(),
+        node_information,
         cancellation_token.clone(),
-    )
-    .await?
+    )?
     .cors_for_info()
     .module(
         &format!("/{}", AuthModules::FaceMatch),

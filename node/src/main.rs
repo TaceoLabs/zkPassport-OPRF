@@ -10,7 +10,7 @@ use std::{net::SocketAddr, process::ExitCode, sync::Arc};
 use eyre::Context as _;
 use serde::Deserialize;
 use taceo_nodes_common::postgres::PostgresConfig;
-use taceo_oprf::service::secret_manager::postgres::PostgresSecretManager;
+use taceo_oprf::service::secret_manager::{SecretManager, postgres::PostgresSecretManager};
 use taceo_zkpassport_oprf_node::config::ZkPassportNodeConfig;
 
 #[cfg(not(target_env = "msvc"))]
@@ -86,10 +86,18 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
     // Clone the values we need afterwards
     let bind_addr = config.bind_addr;
 
+    let node_information = secret_manager
+        .load_node_information()
+        .await
+        .context("while loading node information")?;
+
+    tracing::info!("loaded node-information: {node_information:#?}");
+
     tracing::info!("starting zkPassport service...");
     let oprf_service_router = taceo_zkpassport_oprf_node::start(
         config.node_config,
         secret_manager,
+        node_information,
         cancellation_token.clone(),
     )
     .await?;

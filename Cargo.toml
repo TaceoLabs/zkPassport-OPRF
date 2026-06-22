@@ -31,8 +31,8 @@ reqwest = { version = "0.13", default-features = false }
 rustls = "0.23"
 serde = { version = "1" }
 serde_json = { version = "1" }
-taceo-nodes-common = { version = "0.7.1", default-features = false }
-taceo-oprf = { package = "taceo-oprf", version = "0.15.2" }
+taceo-nodes-common = { version = "0.7.3", default-features = false }
+taceo-oprf = { package = "taceo-oprf", version = "0.16" }
 telemetry-batteries = { version = "0.2.1", default-features = false }
 thiserror = { version = "2" }
 tikv-jemallocator = "0.7"

@@ -5354,9 +5354,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-nodes-common"
-version = "0.7.2"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dea5505990bca89790cece6b15dc7b317963d9725a722186a8756cd568b50b5"
+checksum = "15af1a54071def0649b8e55c8d87afff9cd537565345e939264313aeb7031fc1"
 dependencies = [
  "alloy",
  "axum",
@@ -5377,9 +5377,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-oprf"
-version = "0.15.2"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbfeeeff7896dd31e89383b70ae51dfc4bcabbe5de3fb04b2ce6fb86f90fc805"
+checksum = "1b4f49c8462cb704e9a141490e36b9aba424e4b23524331ecd938c3451c50bd9"
 dependencies = [
  "taceo-oprf-client",
  "taceo-oprf-core",
@@ -5463,9 +5463,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-oprf-service"
-version = "0.16.2"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41af9a727681288b18dea17d5acf98f9d22daf9eed0be7fbf9eeb89f88000271"
+checksum = "eca77dc6b86cff39a566ed5b83c42b7338bf8c9d62959d63c664f2246965abeb"
 dependencies = [
  "alloy",
  "ark-serialize 0.5.0",
@@ -5475,9 +5475,7 @@ dependencies = [
  "backon",
  "ciborium",
  "eyre",
- "futures",
  "http",
- "humantime",
  "humantime-serde",
  "metrics",
  "moka",

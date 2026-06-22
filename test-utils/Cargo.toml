@@ -1,0 +1,26 @@
+[package]
+name = "taceo-zkpassport-oprf-test-utils"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Shared test fixtures and container harness for zkPassport OPRF."
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["cryptography", "mpc", "oprf"]
+publish.workspace = true
+
+[dependencies]
+ark-babyjubjub.workspace = true
+ark-ff.workspace = true
+serde_json.workspace = true
+zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
+
+# container harness (feature-gated)
+testcontainers = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["sync"] }
+
+[features]
+containers = ["dep:testcontainers", "dep:reqwest", "dep:tokio"]

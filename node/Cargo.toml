@@ -40,3 +40,6 @@ zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authenticati
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator.workspace = true
+
+[dev-dependencies]
+zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1", features = ["containers"] }

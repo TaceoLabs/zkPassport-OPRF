@@ -44,7 +44,7 @@ pub enum FaceMatchAuthError {
     /// Oracle rejected the proofs
     #[error("Oracle verification failed: {0}")]
     OracleVerificationFailed(String),
-    /// Oracle rejected the proofs
+    /// Oracle returned a non-success HTTP status
     #[error("Non 200 status code: {status} with body: {body}")]
     UnexpectedStatusCode { status: StatusCode, body: String },
     /// Serde
@@ -85,14 +85,15 @@ pub struct FaceMatchAuthenticator {
 }
 
 impl FaceMatchAuthenticator {
-    /// Initialize the authenticator and verify the oracle is reachable.
+    /// Initialize the authenticator.
     ///
-    /// Builds an HTTP client, pings the oracle's health endpoint, and constructs the
-    /// `verify_url` used for subsequent proof-verification requests.
+    /// Builds an HTTP client and stores the `verify_url` used for subsequent
+    /// proof-verification requests. Oracle reachability is not checked here; a
+    /// separate background task polls the oracle's health endpoint (see
+    /// [`crate::services::health_check`]).
     ///
     /// # Errors
-    /// Returns an error if the HTTP client cannot be built or the oracle does not
-    /// respond with `200 OK`.
+    /// Returns an error if the HTTP client cannot be built.
     pub fn init(verify_url: Url) -> eyre::Result<Self> {
         // we use the client-builder to avoid panic if we cannot install tls backend
         let client = ClientBuilder::new()
@@ -122,7 +123,7 @@ impl FaceMatchAuthenticator {
             .send()
             .await?;
 
-        // classify a non-success HTTP status as OracleNotReachable, but log the body for diagnostics
+        // a non-success HTTP status maps to an internal error; capture the body for diagnostics
         let status = response.status();
         if !status.is_success() {
             let body = response

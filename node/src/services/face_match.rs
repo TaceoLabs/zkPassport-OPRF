@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 
 use ark_serialize::CanonicalSerialize;
 use eyre::Context as _;
-use reqwest::{ClientBuilder, Url};
+use reqwest::{ClientBuilder, StatusCode, Url};
 use serde::ser::Error;
 
 use serde::{Deserialize, Serialize, Serializer};
@@ -44,9 +44,12 @@ pub enum FaceMatchAuthError {
     /// Oracle rejected the proofs
     #[error("Oracle verification failed: {0}")]
     OracleVerificationFailed(String),
-    /// Internal server error
+    /// Oracle rejected the proofs
+    #[error("Non 200 status code: {status} with body: {body}")]
+    UnexpectedStatusCode { status: StatusCode, body: String },
+    /// Serde
     #[error(transparent)]
-    Internal(#[from] eyre::Report),
+    InvalidMessage(#[from] serde_json::Error),
 }
 
 impl From<FaceMatchAuthError> for AuthErrorKind {
@@ -54,27 +57,20 @@ impl From<FaceMatchAuthError> for AuthErrorKind {
         match value {
             FaceMatchAuthError::OracleNotReachable(_) => Self::OracleNotReachable,
             FaceMatchAuthError::OracleVerificationFailed(_) => Self::OracleVerificationFailed,
-            FaceMatchAuthError::Internal(_) => Self::Internal,
+            FaceMatchAuthError::UnexpectedStatusCode { .. }
+            | FaceMatchAuthError::InvalidMessage(_) => Self::Internal,
         }
     }
 }
 
 impl FaceMatchAuthError {
     /// Log the error at the appropriate tracing level.
-    ///
-    /// [`Internal`](Self::Internal) errors are logged at `error` level with a full
-    /// report chain; all other variants are logged at `debug` level.
+    #[inline]
     pub(crate) fn log(&self) {
-        match self {
-            FaceMatchAuthError::OracleNotReachable(_) => {
-                tracing::warn!(err=?self,"oracle not reachable: {self}");
-            }
-            FaceMatchAuthError::OracleVerificationFailed(_) => {
-                tracing::warn!(auth_error = true, err=?self, "{self}");
-            }
-            FaceMatchAuthError::Internal(report) => {
-                tracing::error!(err=?report, "Internal Server Error");
-            }
+        if matches!(self, FaceMatchAuthError::OracleVerificationFailed(_)) {
+            tracing::warn!(err=?self, auth_error=true, "{self}");
+        } else {
+            tracing::error!(err=?self, "{self}");
         }
     }
 }
@@ -127,22 +123,17 @@ impl FaceMatchAuthenticator {
             .await?;
 
         // classify a non-success HTTP status as OracleNotReachable, but log the body for diagnostics
-        if let Err(err) = response.error_for_status_ref() {
+        let status = response.status();
+        if !status.is_success() {
             let body = response
                 .text()
                 .await
                 .unwrap_or_else(|err| format!("<failed to read body: {err}>"));
-            tracing::warn!(%body, "oracle verify endpoint returned non-success status");
-            return Err(err.into());
+            return Err(FaceMatchAuthError::UnexpectedStatusCode { status, body });
         }
+        let response = response.text().await?;
 
-        let response = response
-            .text()
-            .await
-            .context("while fetching response from oracle")?;
-
-        let oracle_response = serde_json::from_str::<OracleVerifyResponse>(&response)
-            .with_context(|| format!("while parsing oracle response: {response}"))?;
+        let oracle_response = serde_json::from_str::<OracleVerifyResponse>(&response)?;
 
         if !oracle_response.verified {
             let error_msg = oracle_response

@@ -35,7 +35,10 @@ use taceo_oprf::{
 use tokio_util::sync::CancellationToken;
 use zkpassport_oprf_authentication::AuthModules;
 
-use crate::{config::ZkPassportNodeConfig, services::FaceMatchAuthenticator};
+use crate::{
+    config::ZkPassportNodeConfig,
+    services::{face_match::FaceMatchAuthenticator, health_check},
+};
 
 pub mod config;
 pub mod metrics;
@@ -53,20 +56,23 @@ pub(crate) mod services;
 ///
 /// # Errors
 /// Returns an error if the oracle health-check fails or the OPRF service cannot initialize.
-pub async fn start(
+pub fn start(
     config: ZkPassportNodeConfig,
     secret_manager: SecretManagerService,
     node_information: NodeInformation,
     cancellation_token: CancellationToken,
 ) -> eyre::Result<axum::Router> {
-    tracing::info!("starting oprf-service with config: {config:#?}");
     let node_config = config.node_config;
     let started_services = StartedServices::default();
 
+    tokio::task::spawn(health_check::oracle_health_check_task(
+        config.oracle_health_check_interval,
+        config.oracle_health_check_url,
+    ));
+
     tracing::info!("init oprf request auth service..");
     let oprf_req_auth_service = Arc::new(
-        FaceMatchAuthenticator::init(config.oracle_health_check_url, config.oracle_verifier_url)
-            .await
+        FaceMatchAuthenticator::init(config.oracle_verifier_url)
             .context("while spawning authenticator")?,
     );
 
@@ -76,7 +82,7 @@ pub async fn start(
         secret_manager,
         started_services.clone(),
         node_information,
-        cancellation_token.clone(),
+        cancellation_token,
     )?
     .cors_for_info()
     .module(

@@ -16,6 +16,7 @@ ark-serialize.workspace = true
 axum = { workspace = true }
 config = { workspace = true }
 eyre.workspace = true
+humantime-serde.workspace = true
 metrics = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }

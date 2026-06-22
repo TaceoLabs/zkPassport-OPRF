@@ -1,5 +1,7 @@
 //! Configuration types and CLI/environment parsing for the OPRF node.
 
+use std::time::Duration;
+
 use reqwest::Url;
 use serde::Deserialize;
 use taceo_oprf::service::{VersionReq, config::OprfNodeServiceConfig};
@@ -16,9 +18,20 @@ pub struct ZkPassportNodeConfig {
     /// The `URL` of the oracle verifying the face-match proofs.
     pub oracle_verifier_url: Url,
 
+    /// The interval in which we do health checks.
+    #[serde(default = "ZkPassportNodeConfig::default_oracle_health_check_interval")]
+    #[serde(with = "humantime_serde")]
+    pub oracle_health_check_interval: Duration,
+
     /// The OPRF service config
     #[serde(rename = "oprf")]
     pub node_config: OprfNodeServiceConfig,
+}
+
+impl ZkPassportNodeConfig {
+    fn default_oracle_health_check_interval() -> Duration {
+        Duration::from_mins(5)
+    }
 }
 
 impl ZkPassportNodeConfig {
@@ -33,6 +46,7 @@ impl ZkPassportNodeConfig {
         Self {
             oracle_health_check_url,
             oracle_verifier_url,
+            oracle_health_check_interval: Self::default_oracle_health_check_interval(),
             node_config: OprfNodeServiceConfig::with_default_values(environment, version_req),
         }
     }

@@ -99,8 +99,7 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
         secret_manager,
         node_information,
         cancellation_token.clone(),
-    )
-    .await?;
+    )?;
 
     tracing::info!("starting axum server on {bind_addr}",);
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;

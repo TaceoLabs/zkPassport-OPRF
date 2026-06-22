@@ -5586,6 +5586,7 @@ dependencies = [
  "axum",
  "config",
  "eyre",
+ "humantime-serde",
  "metrics",
  "reqwest 0.13.4",
  "rustls",

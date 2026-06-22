@@ -108,12 +108,16 @@ impl FaceMatchAuthenticator {
             .send()
             .await
             .context("while trying to reach oracle")?;
-        let status_code = response.status();
-        if status_code == StatusCode::OK {
+        let status = response.status();
+        if status == StatusCode::OK {
             tracing::info!("oracle is healthy!");
         } else {
-            tracing::warn!("cannot reach oracle: {response:?}");
-            eyre::bail!("cannot reach oracle");
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|err| format!("<failed to read body: {err}>"));
+            tracing::warn!(%status, %body, "oracle health check returned non-200 status");
+            eyre::bail!("oracle health check failed: status {status}, body: {body}");
         }
         Ok(Self {
             client,
@@ -142,16 +146,23 @@ impl FaceMatchAuthenticator {
             .send()
             .await?;
 
+        // classify a non-success HTTP status as OracleNotReachable, but log the body for diagnostics
+        if let Err(err) = response.error_for_status_ref() {
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|err| format!("<failed to read body: {err}>"));
+            tracing::warn!(%body, "oracle verify endpoint returned non-success status");
+            return Err(err.into());
+        }
+
         let response = response
             .text()
             .await
             .context("while fetching response from oracle")?;
 
         let oracle_response = serde_json::from_str::<OracleVerifyResponse>(&response)
-            .inspect_err(|err| {
-                tracing::error!(%response, %err, "could not parse response from oracle");
-            })
-            .context("while parsing oracle response")?;
+            .with_context(|| format!("while parsing oracle response: {response}"))?;
 
         if !oracle_response.verified {
             let error_msg = oracle_response
@@ -174,11 +185,10 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
-        Ok(self
-            .authenticate_inner(request)
+        self.authenticate_inner(request)
             .await
             .inspect_err(FaceMatchAuthError::log)
-            .map_err(AuthErrorKind::from)?)
+            .map_err(|err| AuthErrorKind::from(err).into())
     }
 }
 

@@ -37,10 +37,7 @@ enum HealthCheckError {
     Unhealthy { status: StatusCode, body: String },
 }
 
-pub(crate) async fn oracle_health_check_task(
-    health_interval: Duration,
-    health_url: Url,
-) -> eyre::Result<tokio::task::JoinHandle<()>> {
+pub(crate) async fn oracle_health_check_task(health_interval: Duration, health_url: Url) {
     tracing::info!("spawning health check task");
     let mut interval = tokio::time::interval(health_interval);
     loop {

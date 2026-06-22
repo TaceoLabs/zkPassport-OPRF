@@ -8,6 +8,14 @@ GREEN='\033[0;32m'
 
 PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
+if [[ -n "${DEBUG_OPRF:-}" ]]; then
+    OPRF_CARGO_BUILD_ARGS=()
+    OPRF_BUILD_TARGET_DIR="debug"
+else
+    OPRF_CARGO_BUILD_ARGS=(--release)
+    OPRF_BUILD_TARGET_DIR="release"
+fi
+
 wait_for_health() {
     local port=$1
     local name=$2
@@ -76,7 +84,7 @@ start_node() {
     TACEO_OPRF_NODE__SERVICE__OPRF__STORE_TTI=0s \
     TACEO_OPRF_NODE__POSTGRES__CONNECTION_STRING=$db_conn \
     TACEO_OPRF_NODE__POSTGRES__SCHEMA=oprf$i \
-    ./target/debug/taceo-zkpassport-oprf-node > logs/node$i.log 2>&1 &
+    ./target/${OPRF_BUILD_TARGET_DIR}/taceo-zkpassport-oprf-node > logs/node$i.log 2>&1 &
     pid=$!
     echo "started oprf-node $i with PID $pid"
 }
@@ -144,7 +152,7 @@ setup() {
 }
 
 client() {
-    ./target/debug/taceo-zkpassport-dev-client "$@"
+    ./target/${OPRF_BUILD_TARGET_DIR}/taceo-zkpassport-dev-client "$@"
 }
 
 main() {
@@ -154,13 +162,13 @@ main() {
     fi
 
     if [[ $1 = "setup" ]]; then
-        cargo build --workspace 
+        cargo build --workspace "${OPRF_CARGO_BUILD_ARGS[@]+"${OPRF_CARGO_BUILD_ARGS[@]}"}"
         echo -e "${GREEN}running setup..${NOCOLOR}"
         setup
         echo -e "${GREEN}press Ctrl+C to stop${NOCOLOR}"
         wait
     elif [[ $1 = "e2e-test" ]]; then
-        cargo build --workspace
+        cargo build --workspace "${OPRF_CARGO_BUILD_ARGS[@]+"${OPRF_CARGO_BUILD_ARGS[@]}"}"
         echo -e "${GREEN}running test..${NOCOLOR}"
         setup
         client --nodes http://127.0.0.1:10000,http://127.0.0.1:10001,http://127.0.0.1:10002 --oprf-key-registry-contract $oprf_key_registry --max-wait-time 10min reshare-test 

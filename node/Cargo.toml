@@ -35,7 +35,7 @@ tokio = { workspace = true, features = [
   "tokio-macros",
 ] }
 tokio-util.workspace = true
-tracing.workspace = true
+tracing = { workspace = true, features = ["release_max_level_debug"] }
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]

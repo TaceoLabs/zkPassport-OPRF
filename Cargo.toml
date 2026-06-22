@@ -21,11 +21,11 @@ alloy = { version = "2", default-features = false }
 ark-babyjubjub = { package = "taceo-ark-babyjubjub", version = "0.5.3" }
 ark-ff = "0.5"
 ark-serialize = "0.5"
-axum = "0.8"
+# Pin axum to 0.8.8 to avoid pulling in tungstenite 0.29, which conflicts with the tungstenite version used by taceo_oprf upstream. The version mismatch breaks downcast_ref, causing errors to be misclassified.
+axum = "=0.8.8"
 clap = "4"
 config = { version = "0.15", default-features = false }
 eyre = { version = "0.6" }
-humantime = "2"
 humantime-serde = "1.1.1"
 metrics = "0.24"
 rand = { version = "0.8" }
@@ -33,7 +33,7 @@ reqwest = { version = "0.13", default-features = false }
 rustls = "0.23"
 serde = { version = "1" }
 serde_json = { version = "1" }
-taceo-nodes-common = { version = "0.7.3", default-features = false }
+taceo-nodes-common = { version = "0.7", default-features = false }
 taceo-oprf = { package = "taceo-oprf", version = "0.16" }
 telemetry-batteries = { version = "0.2.1", default-features = false }
 thiserror = { version = "2" }

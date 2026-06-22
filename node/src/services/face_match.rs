@@ -143,7 +143,7 @@ impl FaceMatchAuthenticator {
             return Err(FaceMatchAuthError::OracleVerificationFailed(error_msg));
         }
 
-        tracing::debug!("oracle verified proofs successfully");
+        tracing::trace!("oracle verified proofs successfully");
         Ok(request.auth.oprf_key_id)
     }
 }

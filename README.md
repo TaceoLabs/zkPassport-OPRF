@@ -128,6 +128,3 @@ This project is licensed under either of
 * [MIT License](http://opensource.org/licenses/MIT)
 
 at your option.
-
-> **Note:** `LICENSE-APACHE` and `LICENSE-MIT` files are not yet present in the
-> repository root. They should be added to match the declared dual-license.

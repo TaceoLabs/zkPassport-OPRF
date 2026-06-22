@@ -13,13 +13,10 @@ publish.workspace = true
 
 [dependencies]
 alloy = { workspace = true, features = ["full", "rpc", "rpc-client-ws"] }
-ark-babyjubjub.workspace = true
-ark-ff.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 eyre.workspace = true
 rand.workspace = true
 rustls.workspace = true
-serde_json.workspace = true
 taceo-oprf = { workspace = true, features = ["dev-client"] }
 tokio = { workspace = true, features = [
   "net",
@@ -37,3 +34,4 @@ tracing-subscriber = {workspace = true, features = [
 uuid = { workspace = true, features = ["serde", "v4"] }
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
 zkpassport-oprf-client = { package = "taceo-zkpassport-oprf-client", path = "../client", version = "0.1" }
+zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1" }

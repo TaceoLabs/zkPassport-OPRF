@@ -6,6 +6,7 @@ on:
       - main
     tags-ignore:
       - v*
+      - zkpassport-oprf-node-v*
   pull_request:
 
 permissions:

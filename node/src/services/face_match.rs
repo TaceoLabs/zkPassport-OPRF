@@ -48,7 +48,7 @@ pub enum FaceMatchAuthError {
     #[error("Bad Request: {0}")]
     BadRequest(String),
     /// Oracle returned a non-success HTTP status
-    #[error("Non 200 status code: {status} with body: {body}")]
+    #[error("Unexpected status code: {status} with body: {body}")]
     UnexpectedStatusCode { status: StatusCode, body: String },
     /// Serde
     #[error(transparent)]
@@ -73,12 +73,12 @@ impl FaceMatchAuthError {
     pub(crate) fn log(&self) {
         match self {
             FaceMatchAuthError::OracleVerificationFailed(_) | FaceMatchAuthError::BadRequest(_) => {
-                tracing::warn!(err=?self, auth_error=true, "{self}");
+                tracing::warn!(err=%self, auth_error=true, "{self}");
             }
             FaceMatchAuthError::UnexpectedStatusCode { .. }
             | FaceMatchAuthError::InvalidMessage(_)
             | Self::OracleNotReachable(_) => {
-                tracing::error!(err=?self, "{self}");
+                tracing::error!(err=%self, "{self}");
             }
         }
     }
@@ -112,9 +112,6 @@ impl FaceMatchAuthenticator {
     }
 
     /// Send the OPRF request's blinded query and proofs to the oracle and return the key ID.
-    ///
-    /// Returns [`FaceMatchAuthError::OracleVerificationFailed`] if the oracle
-    /// reports `verified: false`.
     async fn authenticate_inner(
         &self,
         request: &OprfRequest<FaceMatchRequestAuth>,
@@ -132,7 +129,6 @@ impl FaceMatchAuthenticator {
             .send()
             .await?;
 
-        // a non-success HTTP status maps to an internal error; capture the body for diagnostics
         let status = response.status();
 
         if status == StatusCode::OK {

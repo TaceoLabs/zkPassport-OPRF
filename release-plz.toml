@@ -6,6 +6,7 @@ release = false
 [[package]]
 name = "taceo-zkpassport-oprf-node"
 release = true
+publish = false
 git_release_enable = true
 # Drop the "taceo-" prefix so the tag matches what build-and-push-node.yml
 # listens for: "zkpassport-oprf-node-v*"

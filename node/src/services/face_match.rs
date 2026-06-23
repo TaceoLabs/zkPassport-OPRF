@@ -71,10 +71,15 @@ impl FaceMatchAuthError {
     /// Log the error at the appropriate tracing level.
     #[inline]
     pub(crate) fn log(&self) {
-        if matches!(self, FaceMatchAuthError::OracleVerificationFailed(_)) {
-            tracing::warn!(err=?self, auth_error=true, "{self}");
-        } else {
-            tracing::error!(err=?self, "{self}");
+        match self {
+            FaceMatchAuthError::OracleVerificationFailed(_) | FaceMatchAuthError::BadRequest(_) => {
+                tracing::warn!(err=?self, auth_error=true, "{self}");
+            }
+            FaceMatchAuthError::UnexpectedStatusCode { .. }
+            | FaceMatchAuthError::InvalidMessage(_)
+            | Self::OracleNotReachable(_) => {
+                tracing::error!(err=?self, "{self}");
+            }
         }
     }
 }

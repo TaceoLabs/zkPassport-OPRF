@@ -44,6 +44,9 @@ pub enum FaceMatchAuthError {
     /// Oracle rejected the proofs
     #[error("Oracle verification failed: {0}")]
     OracleVerificationFailed(String),
+    /// Oracle returned with BAD REQUEST
+    #[error("Bad Request: {0}")]
+    BadRequest(String),
     /// Oracle returned a non-success HTTP status
     #[error("Non 200 status code: {status} with body: {body}")]
     UnexpectedStatusCode { status: StatusCode, body: String },
@@ -57,6 +60,7 @@ impl From<FaceMatchAuthError> for AuthErrorKind {
         match value {
             FaceMatchAuthError::OracleNotReachable(_) => Self::OracleNotReachable,
             FaceMatchAuthError::OracleVerificationFailed(_) => Self::OracleVerificationFailed,
+            FaceMatchAuthError::BadRequest(reason) => Self::OracleBadRequest(reason),
             FaceMatchAuthError::UnexpectedStatusCode { .. }
             | FaceMatchAuthError::InvalidMessage(_) => Self::Internal,
         }
@@ -125,26 +129,27 @@ impl FaceMatchAuthenticator {
 
         // a non-success HTTP status maps to an internal error; capture the body for diagnostics
         let status = response.status();
-        if !status.is_success() {
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|err| format!("<failed to read body: {err}>"));
-            return Err(FaceMatchAuthError::UnexpectedStatusCode { status, body });
+        let body_result = response.text().await;
+
+        if status == StatusCode::OK || status == StatusCode::BAD_REQUEST {
+            let oracle_response = serde_json::from_str::<OracleVerifyResponse>(&body_result?)?;
+
+            if !oracle_response.verified {
+                let error_msg = oracle_response
+                    .error
+                    .unwrap_or_else(|| "unknown".to_owned());
+                if status.is_success() {
+                    return Err(FaceMatchAuthError::OracleVerificationFailed(error_msg));
+                }
+                return Err(FaceMatchAuthError::BadRequest(error_msg));
+            }
+
+            tracing::trace!("oracle verified proofs successfully");
+            Ok(request.auth.oprf_key_id)
+        } else {
+            let body = body_result.unwrap_or_else(|err| format!("<failed to read body: {err}>"));
+            Err(FaceMatchAuthError::UnexpectedStatusCode { status, body })
         }
-        let response = response.text().await?;
-
-        let oracle_response = serde_json::from_str::<OracleVerifyResponse>(&response)?;
-
-        if !oracle_response.verified {
-            let error_msg = oracle_response
-                .error
-                .unwrap_or_else(|| "unknown".to_owned());
-            return Err(FaceMatchAuthError::OracleVerificationFailed(error_msg));
-        }
-
-        tracing::trace!("oracle verified proofs successfully");
-        Ok(request.auth.oprf_key_id)
     }
 }
 
@@ -200,4 +205,218 @@ fn serialize_point_to_hex<S: Serializer>(
         write!(&mut hex_y, "{b:02x}").expect("Write to a string should never panic");
     }
     ser.serialize_str(&format!("0x{hex_x}{hex_y}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use ruint::aliases::U160;
+    use taceo_oprf::{
+        core::oprf::BlindingFactor,
+        types::{
+            OprfKeyId,
+            api::{OprfRequest, OprfRequestAuthenticator as _},
+            ark_babyjubjub,
+        },
+    };
+    use uuid::Uuid;
+    use zkpassport_oprf_authentication::{FaceMatchRequestAuth, error_codes};
+    use zkpassport_oprf_test_utils::fixtures::FixtureData;
+
+    use crate::services::face_match::FaceMatchAuthenticator;
+
+    async fn auth_service() -> eyre::Result<FaceMatchAuthenticator> {
+        let proof_verifier_url =
+            zkpassport_oprf_test_utils::containers::get_proof_verifier_url().await;
+        FaceMatchAuthenticator::init(proof_verifier_url.join("verify-oprf-auth?devmode=true")?)
+    }
+
+    fn build_request(fixture: FixtureData) -> OprfRequest<FaceMatchRequestAuth> {
+        let blinding_factor =
+            BlindingFactor::from_scalar(fixture.beta).expect("Invalid blinding factor");
+        let blinded_query =
+            taceo_oprf::core::oprf::client::blind_query(fixture.private_nullifier, blinding_factor);
+        OprfRequest {
+            request_id: Uuid::new_v4(),
+            blinded_query: blinded_query.blinded_query(),
+            auth: FaceMatchRequestAuth {
+                oprf_key_id: OprfKeyId::new(U160::from(1)),
+                proofs: fixture.proofs,
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn success_test() -> eyre::Result<()> {
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let request = build_request(fixture);
+        let oprf_key = auth_service().await?.authenticate(&request).await?;
+        assert_eq!(oprf_key.into_inner(), 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn invalid_proof_test() -> eyre::Result<()> {
+        let mut fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        fixture.proofs[0].proof = Some("invalid value".to_string());
+        let request = build_request(fixture);
+
+        let is_err = auth_service()
+            .await?
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::ORACLE_BAD_REQUEST);
+        assert_eq!(is_err.message(), "Cannot convert undefined to a BigInt");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn swapped_base_proofs_test() -> eyre::Result<()> {
+        let mut fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let dummy = fixture.proofs[0].proof.clone();
+        fixture.proofs[0].proof = fixture.proofs[1].proof.clone();
+        fixture.proofs[1].proof = dummy;
+        let request = build_request(fixture);
+
+        let is_err = auth_service()
+            .await?
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::ORACLE_BAD_REQUEST);
+        assert_eq!(
+            is_err.message(),
+            "Proof verification failed: {\"sig_check_dsc\":{\"certificate\":{\"expected\":\"A valid root from ZKPassport Registry\",\"received..."
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn wrong_proof_count_test() -> eyre::Result<()> {
+        let mut fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        fixture.proofs.pop();
+        let request = build_request(fixture);
+
+        let is_err = auth_service()
+            .await?
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::ORACLE_BAD_REQUEST);
+        assert_eq!(
+            is_err.message(),
+            "Expected 5 subproofs (3 base + facematch + oprf_auth), got 4"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn missing_facematch_proof_test() -> eyre::Result<()> {
+        let mut fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        fixture.proofs[3].proof = None;
+        let request = build_request(fixture);
+
+        let is_err = auth_service()
+            .await?
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::ORACLE_BAD_REQUEST);
+        assert_eq!(is_err.message(), "Missing required facematch proof");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn missing_oprf_auth_proof_test() -> eyre::Result<()> {
+        let mut fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        fixture.proofs[4].proof = None;
+        let request = build_request(fixture);
+
+        let is_err = auth_service()
+            .await?
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::ORACLE_BAD_REQUEST);
+        assert_eq!(is_err.message(), "Missing required oprf_auth proof");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn blinded_identifier_mismatch_test() -> eyre::Result<()> {
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+
+        // Blind with scalar 2 instead of the fixture's beta so the transmitted point
+        // diverges from the one baked into the oprf_auth proof.
+        let different_beta = ark_babyjubjub::Fr::from(2u64);
+        let blinding_factor =
+            BlindingFactor::from_scalar(different_beta).expect("Invalid blinding factor");
+        let blinded_query =
+            taceo_oprf::core::oprf::client::blind_query(fixture.private_nullifier, blinding_factor);
+        let request = OprfRequest {
+            request_id: Uuid::new_v4(),
+            blinded_query: blinded_query.blinded_query(),
+            auth: FaceMatchRequestAuth {
+                oprf_key_id: OprfKeyId::new(U160::from(1)),
+                proofs: fixture.proofs,
+            },
+        };
+
+        let is_err = auth_service()
+            .await?
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::ORACLE_BAD_REQUEST);
+        assert_eq!(
+            is_err.message(),
+            "blinded_unique_identifier does not match oprf_auth proof output"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn oracle_unreachable_test() -> eyre::Result<()> {
+        // Port 1 on loopback is never open; any connection attempt immediately
+        // returns ECONNREFUSED without waiting for a timeout.
+        let auth_service =
+            FaceMatchAuthenticator::init("http://127.0.0.1:1/verify-oprf-auth".parse()?)?;
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let request = build_request(fixture);
+
+        let is_err = auth_service
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::ORACLE_NOT_REACHABLE);
+        assert_eq!(is_err.message(), "oracle not reachable - try again later");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn oracle_empty_proofs() -> eyre::Result<()> {
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let mut request = build_request(fixture);
+        request.auth.proofs.clear();
+
+        let is_err = auth_service()
+            .await?
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::ORACLE_BAD_REQUEST);
+        assert_eq!(
+            is_err.message(),
+            "Expected 5 subproofs (3 base + facematch + oprf_auth), got 0"
+        );
+
+        Ok(())
+    }
 }

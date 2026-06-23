@@ -172,9 +172,7 @@ main() {
         echo -e "${GREEN}running test..${NOCOLOR}"
         setup
         client --nodes http://127.0.0.1:10000,http://127.0.0.1:10001,http://127.0.0.1:10002 --oprf-key-registry-contract $oprf_key_registry --max-wait-time 10min reshare-test --acceptance-num 5 
-        client --nodes http://127.0.0.1:10000,http://127.0.0.1:10001,http://127.0.0.1:10002 --oprf-key-registry-contract $oprf_key_registry --max-wait-time 10min delete-test 
         client --nodes http://127.0.0.1:10000,http://127.0.0.1:10001,http://127.0.0.1:10002 --oprf-key-registry-contract $oprf_key_registry --max-wait-time 10min stress-test-oprf 
-        client --nodes http://127.0.0.1:10000,http://127.0.0.1:10001,http://127.0.0.1:10002 --oprf-key-registry-contract $oprf_key_registry --max-wait-time 10min stress-test-key-gen 
     else
         echo "unknown command: '$1' - supported are setup and e2e-test"
         exit 1

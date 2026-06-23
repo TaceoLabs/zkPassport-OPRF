@@ -41,9 +41,6 @@ pub enum FaceMatchAuthError {
     /// Cannot reach oracle
     #[error(transparent)]
     OracleNotReachable(#[from] reqwest::Error),
-    /// Oracle rejected the proofs
-    #[error("Oracle verification failed: {0}")]
-    OracleVerificationFailed(String),
     /// Oracle returned with BAD REQUEST
     #[error("Bad Request: {0}")]
     BadRequest(String),
@@ -59,7 +56,6 @@ impl From<FaceMatchAuthError> for AuthErrorKind {
     fn from(value: FaceMatchAuthError) -> Self {
         match value {
             FaceMatchAuthError::OracleNotReachable(_) => Self::OracleNotReachable,
-            FaceMatchAuthError::OracleVerificationFailed(_) => Self::OracleVerificationFailed,
             FaceMatchAuthError::BadRequest(reason) => Self::OracleBadRequest(reason),
             FaceMatchAuthError::UnexpectedStatusCode { .. }
             | FaceMatchAuthError::InvalidMessage(_) => Self::Internal,
@@ -71,15 +67,10 @@ impl FaceMatchAuthError {
     /// Log the error at the appropriate tracing level.
     #[inline]
     pub(crate) fn log(&self) {
-        match self {
-            FaceMatchAuthError::OracleVerificationFailed(_) | FaceMatchAuthError::BadRequest(_) => {
-                tracing::warn!(err=%self, auth_error=true, "{self}");
-            }
-            FaceMatchAuthError::UnexpectedStatusCode { .. }
-            | FaceMatchAuthError::InvalidMessage(_)
-            | Self::OracleNotReachable(_) => {
-                tracing::error!(err=%self, "{self}");
-            }
+        if matches!(self, FaceMatchAuthError::BadRequest(_)) {
+            tracing::warn!(err=%self, auth_error=true, "{self}");
+        } else {
+            tracing::error!(err=%self, "{self}");
         }
     }
 }

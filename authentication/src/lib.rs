@@ -102,9 +102,6 @@ pub enum AuthErrorKind {
     /// The oracle service responded with BAD REQUEST.
     #[error("oracle_bad_request")]
     OracleBadRequest(String),
-    /// The oracle rejected the provided zkPassport proofs.
-    #[error("oracle_verification_failed")]
-    OracleVerificationFailed,
     /// An unexpected internal error occurred.
     #[error("internal_server_error")]
     Internal,
@@ -114,10 +111,8 @@ pub enum AuthErrorKind {
 pub mod error_codes {
     /// Error code for [`super::AuthErrorKind::OracleNotReachable`].
     pub const ORACLE_NOT_REACHABLE: u16 = 4500;
-    /// Error code for [`super::AuthErrorKind::OracleVerificationFailed`].
-    pub const ORACLE_VERIFICATION_FAILED: u16 = 4501;
     /// Error code for [`super::AuthErrorKind::OracleBadRequest`].
-    pub const ORACLE_BAD_REQUEST: u16 = 4502;
+    pub const ORACLE_BAD_REQUEST: u16 = 4501;
     /// Error code for [`super::AuthErrorKind::Internal`].
     pub const INTERNAL: u16 = 1011;
 }
@@ -127,7 +122,6 @@ impl From<AuthErrorKind> for u16 {
         match value {
             AuthErrorKind::OracleNotReachable => error_codes::ORACLE_NOT_REACHABLE,
             AuthErrorKind::OracleBadRequest(_) => error_codes::ORACLE_BAD_REQUEST,
-            AuthErrorKind::OracleVerificationFailed => error_codes::ORACLE_VERIFICATION_FAILED,
             AuthErrorKind::Internal => error_codes::INTERNAL,
         }
     }
@@ -138,9 +132,6 @@ impl From<AuthErrorKind> for OprfRequestAuthenticatorError {
         let message = match &value {
             AuthErrorKind::OracleNotReachable => {
                 taceo_oprf::types::close_frame_message!("oracle not reachable - try again later")
-            }
-            AuthErrorKind::OracleVerificationFailed => {
-                taceo_oprf::types::close_frame_message!("proof verification failed")
             }
             AuthErrorKind::OracleBadRequest(reason) => {
                 CloseFrameMessage::new_truncate(reason.to_owned())

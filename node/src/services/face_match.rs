@@ -134,25 +134,25 @@ impl FaceMatchAuthenticator {
 
         // a non-success HTTP status maps to an internal error; capture the body for diagnostics
         let status = response.status();
-        let body_result = response.text().await;
 
-        if status == StatusCode::OK || status == StatusCode::BAD_REQUEST {
-            let oracle_response = serde_json::from_str::<OracleVerifyResponse>(&body_result?)?;
-
-            if !oracle_response.verified {
-                let error_msg = oracle_response
-                    .error
-                    .unwrap_or_else(|| "unknown".to_owned());
-                if status.is_success() {
-                    return Err(FaceMatchAuthError::OracleVerificationFailed(error_msg));
-                }
-                return Err(FaceMatchAuthError::BadRequest(error_msg));
-            }
-
+        if status == StatusCode::OK {
             tracing::trace!("oracle verified proofs successfully");
             Ok(request.auth.oprf_key_id)
+        } else if status == StatusCode::BAD_REQUEST {
+            tracing::trace!("received BAD REQUEST from oracle");
+            let body = response.text().await?;
+            let error_msg = match serde_json::from_str::<OracleVerifyResponse>(&body) {
+                Ok(response) => response.error.unwrap_or_else(|| "unknown".to_owned()),
+                Err(err) => {
+                    tracing::error!(%err,"could not parse oracle verify response: {err}");
+                    "unknown".to_owned()
+                }
+            };
+
+            Err(FaceMatchAuthError::BadRequest(error_msg))
         } else {
-            let body = body_result.unwrap_or_else(|err| format!("<failed to read body: {err}>"));
+            tracing::trace!("unknown status code: {status}");
+            let body = response.text().await?;
             Err(FaceMatchAuthError::UnexpectedStatusCode { status, body })
         }
     }

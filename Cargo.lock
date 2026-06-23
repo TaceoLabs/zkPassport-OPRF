@@ -6978,7 +6978,7 @@ dependencies = [
 
 [[package]]
 name = "taceo-zkpassport-oprf-node"
-version = "1.0.0-rc.5"
+version = "1.0.0"
 dependencies = [
  "ark-serialize 0.5.0",
  "axum",

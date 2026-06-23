@@ -33,7 +33,7 @@ pub async fn get_proof_verifier_url() -> Url {
                 .with_env_var("HOST", "0.0.0.0")
                 .start()
                 .await
-                .expect("Cannot start to start test-container");
+                .expect("Cannot start test-container");
 
             let host_port = container
                 .get_host_port_ipv4(PROOF_VERIFIER_INTERNAL_PORT)

@@ -42,4 +42,7 @@ zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authenticati
 tikv-jemallocator.workspace = true
 
 [dev-dependencies]
+ruint.workspace = true
+uuid = { workspace = true, features = ["serde", "v4"] }
 zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1", features = ["containers"] }
+

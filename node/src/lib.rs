@@ -97,18 +97,3 @@ pub fn start(
 
     Ok(router)
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::services::face_match::FaceMatchAuthenticator;
-
-    #[tokio::test]
-    #[ignore = "requires Docker and a running proof-verifier container; full test is follow-up work"]
-    async fn success_test() -> eyre::Result<()> {
-        let proof_verifier_url =
-            zkpassport_oprf_test_utils::containers::get_proof_verifier_url().await;
-        let _auth_service = FaceMatchAuthenticator::init(proof_verifier_url)?;
-        // TODO: build OprfRequest from fixtures and assert authenticate succeeds
-        Ok(())
-    }
-}

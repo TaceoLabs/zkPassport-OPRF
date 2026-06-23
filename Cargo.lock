@@ -6987,6 +6987,7 @@ dependencies = [
  "humantime-serde",
  "metrics",
  "reqwest 0.13.4",
+ "ruint",
  "rustls",
  "serde",
  "serde_json",
@@ -7000,6 +7001,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

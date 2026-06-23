@@ -30,7 +30,10 @@
 //!   `OprfRequestAuthenticatorError`.
 
 use serde::{Deserialize, Serialize};
-use taceo_oprf::types::{OprfKeyId, api::OprfRequestAuthenticatorError};
+use taceo_oprf::types::{
+    OprfKeyId,
+    api::{CloseFrameMessage, OprfRequestAuthenticatorError},
+};
 
 /// Identifies the authentication module used for an OPRF request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,12 +93,15 @@ pub struct ZKPassportProofResult {
 /// Maps to numeric error codes in [`error_codes`] and converts to
 /// [`OprfRequestAuthenticatorError`]
 /// for returning over the WebSocket connection.
-#[derive(Copy, Clone, Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AuthErrorKind {
     /// The oracle service could not be reached (network error or timeout).
     #[error("oracle_not_reachable")]
     OracleNotReachable,
+    /// The oracle service responded with BAD REQUEST.
+    #[error("oracle_bad_request")]
+    OracleBadRequest(String),
     /// The oracle rejected the provided zkPassport proofs.
     #[error("oracle_verification_failed")]
     OracleVerificationFailed,
@@ -110,6 +116,8 @@ pub mod error_codes {
     pub const ORACLE_NOT_REACHABLE: u16 = 4500;
     /// Error code for [`super::AuthErrorKind::OracleVerificationFailed`].
     pub const ORACLE_VERIFICATION_FAILED: u16 = 4501;
+    /// Error code for [`super::AuthErrorKind::OracleBadRequest`].
+    pub const ORACLE_BAD_REQUEST: u16 = 4502;
     /// Error code for [`super::AuthErrorKind::Internal`].
     pub const INTERNAL: u16 = 1011;
 }
@@ -118,6 +126,7 @@ impl From<AuthErrorKind> for u16 {
     fn from(value: AuthErrorKind) -> Self {
         match value {
             AuthErrorKind::OracleNotReachable => error_codes::ORACLE_NOT_REACHABLE,
+            AuthErrorKind::OracleBadRequest(_) => error_codes::ORACLE_BAD_REQUEST,
             AuthErrorKind::OracleVerificationFailed => error_codes::ORACLE_VERIFICATION_FAILED,
             AuthErrorKind::Internal => error_codes::INTERNAL,
         }
@@ -126,18 +135,21 @@ impl From<AuthErrorKind> for u16 {
 
 impl From<AuthErrorKind> for OprfRequestAuthenticatorError {
     fn from(value: AuthErrorKind) -> Self {
-        let code = u16::from(value);
-        let message = match value {
+        let message = match &value {
             AuthErrorKind::OracleNotReachable => {
                 taceo_oprf::types::close_frame_message!("oracle not reachable - try again later")
             }
             AuthErrorKind::OracleVerificationFailed => {
                 taceo_oprf::types::close_frame_message!("proof verification failed")
             }
+            AuthErrorKind::OracleBadRequest(reason) => {
+                CloseFrameMessage::new_truncate(reason.to_owned())
+            }
             AuthErrorKind::Internal => {
                 taceo_oprf::types::close_frame_message!("internal")
             }
         };
+        let code = u16::from(value);
         OprfRequestAuthenticatorError::with_message(code, message)
     }
 }

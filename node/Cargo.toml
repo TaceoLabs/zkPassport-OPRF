@@ -1,6 +1,6 @@
 [package]
 name = "taceo-zkpassport-oprf-node"
-version = "1.0.0"
+version = "1.0.0-rc.5"
 edition.workspace = true
 rust-version.workspace = true
 description = "Backend server for zkPassport instance of TACEO:OPRF"

@@ -163,7 +163,7 @@ jobs:
           mkdir -p ${{ runner.temp }}/digests
           digest='${{ steps.push-image.outputs.digest }}'
           if [[ -z "$digest" || "$digest" == "null" ]]; then
-            echo "Unable to determine pushed digest for ${{ steps.scan-image.outputs.image }}" >&2
+            # echo "Unable to determine pushed digest for ${{ steps.scan-image.outputs.image }}" >&2
             exit 1
           fi
           touch "${{ runner.temp }}/digests/${digest#sha256:}"

@@ -15,6 +15,7 @@ use taceo_zkpassport_oprf_node::config::ZkPassportNodeConfig;
 
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
+use tower_http::catch_panic::CatchPanicLayer;
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
@@ -99,7 +100,8 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
         secret_manager,
         node_information,
         cancellation_token.clone(),
-    )?;
+    )?
+    .layer(CatchPanicLayer::new());
 
     tracing::info!("starting axum server on {bind_addr}",);
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;

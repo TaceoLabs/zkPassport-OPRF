@@ -7000,6 +7000,7 @@ dependencies = [
  "tikv-jemallocator",
  "tokio",
  "tokio-util",
+ "tower-http",
  "tracing",
  "uuid",
 ]
@@ -7422,6 +7423,7 @@ dependencies = [
  "futures-util",
  "http",
  "http-body",
+ "http-body-util",
  "pin-project-lite",
  "tokio",
  "tower",

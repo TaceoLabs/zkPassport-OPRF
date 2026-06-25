@@ -12,7 +12,12 @@ keywords = ["cryptography", "mpc", "oprf"]
 publish.workspace = true
 
 [dependencies]
-alloy = { workspace = true, features = ["full", "rpc", "rpc-client-ws"] }
+alloy = { workspace = true, features = [
+  "full",
+  "reqwest",
+  "rpc",
+  "rpc-client-ws"
+] }
 clap = { workspace = true, features = ["derive", "env"] }
 eyre.workspace = true
 rand.workspace = true
@@ -27,10 +32,10 @@ tokio = { workspace = true, features = [
   "tokio-macros",
 ] }
 tracing.workspace = true
-tracing-subscriber = {workspace = true, features = [
+tracing-subscriber = { workspace = true, features = [
   "env-filter",
   "fmt",
-]}
+] }
 uuid = { workspace = true, features = ["serde", "v4"] }
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
 zkpassport-oprf-client = { package = "taceo-zkpassport-oprf-client", path = "../client", version = "0.1" }

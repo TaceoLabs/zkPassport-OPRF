@@ -13,12 +13,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies — this is the caching Docker layer
-RUN cargo chef cook --release --locked --recipe-path recipe.json
+RUN cargo chef cook --release --locked -p taceo-zkpassport-oprf-node --bin taceo-zkpassport-oprf-node --recipe-path recipe.json
 # Build application
 COPY . .
 ARG GIT_HASH
 ENV GIT_HASH=$GIT_HASH
-RUN cargo build --release --locked --bin taceo-zkpassport-oprf-node
+RUN cargo build --release --locked -p taceo-zkpassport-oprf-node --bin taceo-zkpassport-oprf-node
 
 # Build healthcheck
 FROM rust:1.91.0-bookworm AS healthcheck-builder

@@ -95,13 +95,9 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
     tracing::info!("loaded node-information: {node_information:#?}");
 
     tracing::info!("starting zkPassport service...");
-    let oprf_service_router = taceo_zkpassport_oprf_node::start(
-        config.node_config,
-        secret_manager,
-        node_information,
-        cancellation_token.clone(),
-    )?
-    .layer(CatchPanicLayer::new());
+    let oprf_service_router =
+        taceo_zkpassport_oprf_node::start(config.node_config, secret_manager, &node_information)?
+            .layer(CatchPanicLayer::new());
 
     tracing::info!("starting axum server on {bind_addr}",);
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;

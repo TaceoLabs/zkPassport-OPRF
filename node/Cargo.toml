@@ -18,12 +18,13 @@ config = { workspace = true }
 eyre.workspace = true
 humantime-serde.workspace = true
 metrics = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+url = { workspace = true, features = ["serde"] }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 taceo-nodes-common = { workspace = true, features = ["postgres"] }
-taceo-oprf = { workspace = true, features = ["service"] }
+taceo-oprf = { workspace = true, features = ["service", "postgres"] }
 telemetry-batteries = { workspace = true, features = ["metrics-statsd"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = [
@@ -44,5 +45,6 @@ tikv-jemallocator.workspace = true
 
 [dev-dependencies]
 ruint.workspace = true
+taceo-oprf = { workspace = true, features = ["service", "postgres", "core"] }
 uuid = { workspace = true, features = ["serde", "v4"] }
 zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1", features = ["containers"] }

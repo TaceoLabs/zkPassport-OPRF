@@ -23,14 +23,88 @@ pub struct ZkPassportNodeConfig {
     #[serde(with = "humantime_serde")]
     pub oracle_health_check_interval: Duration,
 
+    /// Request timeout when talking to the verifier oracle.
+    #[serde(default = "ZkPassportNodeConfig::default_oracle_request_timeout")]
+    #[serde(with = "humantime_serde")]
+    pub oracle_request_timeout: Duration,
+
+    /// The retry layer config for face-match auth module.
+    #[serde(rename = "retry")]
+    #[serde(default)]
+    pub face_match_retry_layer: RetryLayerConfig,
+
     /// The OPRF service config
     #[serde(rename = "oprf")]
     pub node_config: OprfNodeServiceConfig,
 }
 
+/// Retry config for retry layers.
+///
+/// Used to build an [`backon::ExponentialBuilder`](https://docs.rs/backon/latest/backon/struct.ExponentialBuilder.html).
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub struct RetryLayerConfig {
+    /// Min interval for retry layer when encountering retryable errors during requests to the verifier oracle.
+    #[serde(
+        default = "RetryLayerConfig::default_verifier_request_min_delay",
+        with = "humantime_serde"
+    )]
+    pub verifier_request_min_delay: Duration,
+
+    /// Max interval for retry layer when encountering retryable errors during requests to the verifier oracle.
+    #[serde(
+        default = "RetryLayerConfig::default_verifier_request_max_delay",
+        with = "humantime_serde"
+    )]
+    pub verifier_request_max_delay: Duration,
+
+    /// Max attempts for retry layer when encountering retryable errors during requests to the verifier oracle.
+    #[serde(default = "RetryLayerConfig::default_verifier_request_max_attempts")]
+    pub verifier_request_max_attempts: usize,
+}
+
 impl ZkPassportNodeConfig {
     fn default_oracle_health_check_interval() -> Duration {
         Duration::from_mins(5)
+    }
+
+    fn default_oracle_request_timeout() -> Duration {
+        Duration::from_secs(10)
+    }
+}
+
+impl Default for RetryLayerConfig {
+    fn default() -> Self {
+        Self::with_default_values()
+    }
+}
+
+impl RetryLayerConfig {
+    fn default_verifier_request_min_delay() -> Duration {
+        Duration::from_millis(250)
+    }
+
+    fn default_verifier_request_max_delay() -> Duration {
+        Duration::from_secs(2)
+    }
+
+    fn default_verifier_request_max_attempts() -> usize {
+        5
+    }
+
+    #[allow(dead_code, reason = "used in test")]
+    pub(crate) fn disabled() -> Self {
+        RetryLayerConfig {
+            verifier_request_max_attempts: 0,
+            ..Default::default()
+        }
+    }
+
+    pub(crate) fn with_default_values() -> Self {
+        Self {
+            verifier_request_min_delay: Self::default_verifier_request_min_delay(),
+            verifier_request_max_delay: Self::default_verifier_request_max_delay(),
+            verifier_request_max_attempts: Self::default_verifier_request_max_attempts(),
+        }
     }
 }
 
@@ -47,6 +121,8 @@ impl ZkPassportNodeConfig {
             oracle_health_check_url,
             oracle_verifier_url,
             oracle_health_check_interval: Self::default_oracle_health_check_interval(),
+            oracle_request_timeout: Self::default_oracle_request_timeout(),
+            face_match_retry_layer: RetryLayerConfig::with_default_values(),
             node_config: OprfNodeServiceConfig::with_default_values(environment, version_req),
         }
     }

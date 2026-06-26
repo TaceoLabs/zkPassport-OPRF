@@ -14,17 +14,17 @@ publish = ["github-only"]
 [dependencies]
 ark-serialize.workspace = true
 axum = { workspace = true }
+backon = { workspace = true, features = ["std", "tokio-sleep"] }
 config = { workspace = true }
 eyre.workspace = true
 humantime-serde.workspace = true
 metrics = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
-url = { workspace = true, features = ["serde"] }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 taceo-nodes-common = { workspace = true, features = ["postgres"] }
-taceo-oprf = { workspace = true, features = ["service", "postgres"] }
+taceo-oprf = { workspace = true, features = ["postgres", "service"] }
 telemetry-batteries = { workspace = true, features = ["metrics-statsd"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = [
@@ -36,15 +36,18 @@ tokio = { workspace = true, features = [
   "tokio-macros",
 ] }
 tokio-util.workspace = true
-tower-http = { workspace = true, features=["catch-panic"] }
+tower-http = { workspace = true, features = ["catch-panic"] }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
+url = { workspace = true, features = ["serde"] }
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
-
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator.workspace = true
 
 [dev-dependencies]
 ruint.workspace = true
-taceo-oprf = { workspace = true, features = ["service", "postgres", "core"] }
+taceo-oprf = { workspace = true, features = ["core", "postgres", "service"] }
 uuid = { workspace = true, features = ["serde", "v4"] }
-zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1", features = ["containers"] }
+zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1", features = [
+  "containers"
+] }
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator.workspace = true

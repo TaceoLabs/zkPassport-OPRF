@@ -24,6 +24,7 @@ ark-ff = "0.5"
 ark-serialize = "0.5"
 # Pin axum to 0.8.8 to avoid pulling in tungstenite 0.29, which conflicts with the tungstenite version used by taceo_oprf upstream. The version mismatch breaks downcast_ref, causing errors to be misclassified.
 axum = "=0.8.8"
+backon = { version = "1.6", default-features = false }
 clap = "4"
 config = { version = "0.15", default-features = false }
 eyre = { version = "0.6" }

@@ -74,8 +74,12 @@ pub fn start(
 
     tracing::info!("init oprf request auth service..");
     let oprf_req_auth_service = Arc::new(
-        FaceMatchAuthenticator::init(config.oracle_verifier_url)
-            .context("while spawning authenticator")?,
+        FaceMatchAuthenticator::init(
+            config.oracle_verifier_url,
+            config.oracle_request_timeout,
+            config.face_match_retry_layer,
+        )
+        .context("while spawning authenticator")?,
     );
 
     tracing::info!("init oprf service..");

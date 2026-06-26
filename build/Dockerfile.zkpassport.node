@@ -1,18 +1,29 @@
-FROM lukemathwalker/cargo-chef:0.1.73-rust-1.91.0-bookworm AS chef
+# Alpine's native libc is musl, so the default Rust target on this image is
+# already *-unknown-linux-musl and binaries are fully static by default. This
+# sidesteps Debian musl-tools' musl-gcc wrapper, which mishandles jemalloc's
+# C11 atomics probe.
+FROM rust:1.91-alpine3.21 AS chef
 WORKDIR /app
+RUN apk add --no-cache musl-dev cmake clang clang-dev pkgconfig perl make \
+    && cargo install cargo-chef --version 0.1.73 --locked
+
+# Pin jemalloc's page size to 16 KiB (2^14). jemalloc captures the build host's
+# page size at compile time and aborts at init when run on a host whose page
+# size exceeds the compiled value. Pinning to 14 keeps the binary compatible
+# with both 4 KiB-page hosts (commodity x86_64 / cloud arm64) and 16 KiB-page
+# hosts (Asahi/Apple-derived kernels, some custom arm64). Cost on 4 KiB hosts
+# is a small RSS overhead. Bump to 16 if 64 KiB-page nodes ever enter scope.
+
+ENV JEMALLOC_SYS_WITH_LG_PAGE=14
 
 FROM chef AS planner
 # See .dockerignore for excluded paths
 COPY . .
-RUN cargo chef prepare --recipe-path recipe.json 
-
+RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends pkg-config \
-    && rm -rf /var/lib/apt/lists/*
 COPY --from=planner /app/recipe.json recipe.json
-# Build dependencies — this is the caching Docker layer
+# Build dependencies -- this is the caching Docker layer
 RUN cargo chef cook --release --locked -p taceo-zkpassport-oprf-node --bin taceo-zkpassport-oprf-node --recipe-path recipe.json
 # Build application
 COPY . .
@@ -20,11 +31,12 @@ ARG GIT_HASH
 ENV GIT_HASH=$GIT_HASH
 RUN cargo build --release --locked -p taceo-zkpassport-oprf-node --bin taceo-zkpassport-oprf-node
 
-# Build healthcheck
-FROM rust:1.91.0-bookworm AS healthcheck-builder
-RUN cargo install --locked simple-web-healthcheck
+# Build healthcheck (statically linked against musl so it runs on scratch)
+FROM rust:1.91-alpine3.21 AS healthcheck-builder
+RUN apk add --no-cache musl-dev
+RUN cargo install simple-web-healthcheck --version 0.3.0 --locked
 
-FROM gcr.io/distroless/cc-debian13:nonroot AS runtime
+FROM scratch AS runtime
 ARG GIT_HASH
 LABEL org.opencontainers.image.title="taceo-zkpassport-oprf-node"
 LABEL org.opencontainers.image.revision=$GIT_HASH
@@ -33,6 +45,8 @@ LABEL org.opencontainers.image.source=https://github.com/TaceoLabs/zkPassport-OP
 LABEL org.opencontainers.image.description="OPRF node for zkPassport"
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 WORKDIR /app
+USER 65532:65532
 COPY --from=healthcheck-builder /usr/local/cargo/bin/simple-web-healthcheck /healthcheck
+COPY --from=builder /etc/ssl/certs/ /etc/ssl/certs/
 COPY --from=builder /app/target/release/taceo-zkpassport-oprf-node /app/taceo-zkpassport-oprf-node
 ENTRYPOINT ["/app/taceo-zkpassport-oprf-node"]

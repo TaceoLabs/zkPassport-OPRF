@@ -5782,7 +5782,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6774,7 +6774,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-oprf"
-version = "0.17.1"
+version = "0.17.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c10bf82ba41bbc8a6693362d67738145c77bdcec36345d85d4a86d2fb7dc44dc"
 dependencies = [
  "taceo-oprf-client",
  "taceo-oprf-core",
@@ -6785,7 +6787,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-oprf-client"
-version = "0.10.2"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cc6179c5bad58f1210bd8872963960145227e8488dfedb4893538acecc5f8ae"
 dependencies = [
  "ark-ec",
  "ciborium",
@@ -6808,6 +6812,8 @@ dependencies = [
 [[package]]
 name = "taceo-oprf-core"
 version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be7f117e2bff79209ce40cdf4af6d566501cb1e63d2e1f9be6134a3bd3a3a2a3"
 dependencies = [
  "ark-ec",
  "ark-ff 0.5.0",
@@ -6827,7 +6833,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-oprf-dev-client"
-version = "0.10.1"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b30f7baef2b02582840721e8e4ce458b6c371f765ac838d1f43732e51f2b7698"
 dependencies = [
  "alloy",
  "ark-ff 0.5.0",
@@ -6852,7 +6860,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-oprf-service"
-version = "0.18.1"
+version = "0.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "537902f741d02186fbe26bae92f9785887c410b3289f621632109ec9169e83ff"
 dependencies = [
  "ark-serialize 0.5.0",
  "async-trait",
@@ -6889,6 +6899,8 @@ dependencies = [
 [[package]]
 name = "taceo-oprf-types"
 version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4b3645c7a7592e8aacdb4ca7270e75da3cca6061ae012521f3cb0dd01ff0b16"
 dependencies = [
  "alloy",
  "ark-ff 0.5.0",
@@ -8035,7 +8047,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

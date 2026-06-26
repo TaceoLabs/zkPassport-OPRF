@@ -14,7 +14,7 @@ check-pr: lint all-tests
 
 [group('test')]
 rust-tests:
-    cargo test --release --workspace --all-features
+    cargo test --workspace --all-features
 
 [group('test')]
 e2e-test:
@@ -29,4 +29,4 @@ run-setup:
 
 [group('deploy')]
 run-dev-client *args:
-    cargo run --release --bin taceo-zkpassport-dev-client {{ args }}
+    cargo run --bin taceo-zkpassport-dev-client {{ args }}

@@ -58,7 +58,7 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: Run Rust Tests
-        run: cargo test --release --workspace --all-features
+        run: cargo test --workspace --all-features
 
   e2e:
     name: E2E

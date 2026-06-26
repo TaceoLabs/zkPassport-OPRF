@@ -8,7 +8,7 @@ GREEN='\033[0;32m'
 
 PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
-if [[ -n "${DEBUG_OPRF:-}" ]]; then
+if [[ -z "${RELEASE_OPRF:-}" ]]; then
     OPRF_CARGO_BUILD_ARGS=()
     OPRF_BUILD_TARGET_DIR="debug"
 else

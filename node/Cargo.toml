@@ -19,7 +19,7 @@ config = { workspace = true }
 eyre.workspace = true
 humantime-serde.workspace = true
 metrics = { workspace = true }
-reqwest = { workspace = true, features = ["json"] }
+reqwest = { workspace = true, features = ["default-tls", "json"] }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

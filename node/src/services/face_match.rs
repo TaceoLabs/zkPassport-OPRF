@@ -72,9 +72,9 @@ impl FaceMatchAuthError {
     #[inline]
     pub(crate) fn log(&self) {
         if matches!(self, FaceMatchAuthError::BadRequest(_)) {
-            tracing::warn!(err=%self, auth_error=true, "{self}");
+            tracing::warn!(err=?self, auth_error=true, "{self}");
         } else {
-            tracing::error!(err=%self, "{self}");
+            tracing::error!(err=?self, "{self}");
         }
     }
 }

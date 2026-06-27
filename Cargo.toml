@@ -30,7 +30,7 @@ config = { version = "0.15", default-features = false }
 eyre = { version = "0.6" }
 humantime-serde = "1.1.1"
 metrics = "0.24"
-rand = { version = "0.8" }
+rand = { version = "0.10" }
 reqwest = { version = "0.13", default-features = false }
 ruint = "1.18.0"
 rustls = "0.23"

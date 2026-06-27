@@ -6939,7 +6939,7 @@ dependencies = [
  "alloy",
  "clap",
  "eyre",
- "rand 0.8.6",
+ "rand 0.10.1",
  "rustls",
  "taceo-oprf",
  "taceo-zkpassport-oprf-authentication",

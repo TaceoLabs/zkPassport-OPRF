@@ -12,7 +12,7 @@ use tokio::sync::OnceCell;
 
 const PROOF_VERIFIER_IMAGE: &str =
     "europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier";
-const PROOF_VERIFIER_TAG: &str = "f68fa52fabea17f5f04c1858eb781cf44149a620";
+const PROOF_VERIFIER_TAG: &str = "57456d6dca5af880a0228bd79f069ce8ed13e18a";
 const PROOF_VERIFIER_INTERNAL_PORT: u16 = 8080;
 
 static PROOF_VERIFIER: OnceCell<(Url, ContainerAsync<GenericImage>)> = OnceCell::const_new();

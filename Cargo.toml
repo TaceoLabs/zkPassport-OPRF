@@ -26,7 +26,6 @@ ark-serialize = "0.5"
 axum = "=0.8.8"
 backon = { version = "1.6", default-features = false }
 clap = "4"
-config = { version = "0.15", default-features = false }
 eyre = { version = "0.6" }
 humantime-serde = "1.1.1"
 metrics = "0.24"
@@ -35,6 +34,7 @@ reqwest = { version = "0.13", default-features = false }
 ruint = "1.18.0"
 rustls = "0.23"
 serde = { version = "1" }
+serde-env = "0.3.0"
 serde_json = { version = "1" }
 taceo-nodes-common = { version = "0.7.4", default-features = false }
 taceo-oprf = { version = "0.17.2", default-features = false }

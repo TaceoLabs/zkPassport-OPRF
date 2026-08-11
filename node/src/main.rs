@@ -37,14 +37,10 @@ struct FullZkPassportNodeConfig {
 
 /// Load and deserialize the node configuration from environment variables.
 ///
-/// Uses the `TACEO_OPRF_NODE__` prefix with `__` as separator.
-///
 /// # Errors
 /// Returns an error if any required variable is missing or cannot be parsed.
-fn load_zk_passport_config() -> Result<FullZkPassportNodeConfig, config::ConfigError> {
-    let cfg = config::Config::builder()
-        .add_source(config::Environment::with_prefix("TACEO_OPRF_NODE").separator("__"));
-    let config = cfg.build()?.try_deserialize()?;
+fn load_zk_passport_config() -> Result<FullZkPassportNodeConfig, serde_env::Error> {
+    let config = serde_env::from_env_with_prefix("TACEO_OPRF_NODE");
     // Unset all env vars with our prefix to prevent leakage to subprocesses.
     // Safety: this is called before any threads are spawned.
     let keys_to_remove: Vec<String> = std::env::vars()

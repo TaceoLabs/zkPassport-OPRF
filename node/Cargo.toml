@@ -15,13 +15,13 @@ publish = ["github-only"]
 ark-serialize.workspace = true
 axum = { workspace = true }
 backon = { workspace = true, features = ["std", "tokio-sleep"] }
-config = { workspace = true }
 eyre.workspace = true
 humantime-serde.workspace = true
 metrics = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls", "json"] }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde-env.workspace = true
 serde_json.workspace = true
 taceo-nodes-common = { workspace = true, features = ["postgres"] }
 taceo-oprf = { workspace = true, features = ["postgres", "service"] }

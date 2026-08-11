@@ -60,8 +60,8 @@ just run-setup
 This will:
 1. Start `anvil` and `postgres` Docker containers
 2. Deploy the `OprfKeyRegistry` smart contract and register participants
-3. Start 3 OPRF key-gen instances (via Docker)
-4. Start a verification oracle (proof-verifier) and 3 OPRF service nodes
+3. Start a verification oracle (proof-verifier) and 3 OPRF service nodes
+4. Start 3 OPRF key-gen instances (via Docker)
 5. Initialize an OPRF key
 
 Log files for all processes are written to the `logs/` directory. Press `Ctrl+C` to tear down.

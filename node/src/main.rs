@@ -5,12 +5,16 @@
 //! the PostgreSQL secret manager, and starts the Axum server with graceful
 //! shutdown support.
 
-use std::{net::SocketAddr, process::ExitCode, sync::Arc};
+use std::{net::SocketAddr, process::ExitCode, sync::Arc, time::Duration};
 
+use backon::{ConstantBuilder, Retryable};
 use eyre::Context as _;
 use serde::Deserialize;
 use taceo_nodes_common::postgres::PostgresConfig;
-use taceo_oprf::service::secret_manager::{SecretManager, postgres::PostgresSecretManager};
+use taceo_oprf::{
+    service::secret_manager::{SecretManager, postgres::PostgresSecretManager},
+    types::service::NodeInformation,
+};
 use taceo_zkpassport_oprf_node::config::ZkPassportNodeConfig;
 
 #[cfg(not(target_env = "msvc"))]
@@ -27,6 +31,15 @@ struct FullZkPassportNodeConfig {
     /// The bind addr of the AXUM server
     #[serde(default = "default_bind_addr")]
     pub bind_addr: SocketAddr,
+    /// The bind addr of the AXUM server
+    #[serde(default = "default_max_times_retry_load_node_information")]
+    pub max_times_retry_load_node_information: usize,
+    /// The bind addr of the AXUM server
+    #[serde(
+        default = "default_delay_retry_load_node_information",
+        with = "humantime_serde"
+    )]
+    pub delay_retry_load_node_information: Duration,
     /// The OPRF service config
     #[serde(rename = "service")]
     pub node_config: ZkPassportNodeConfig,
@@ -52,12 +65,36 @@ fn load_zk_passport_config() -> Result<FullZkPassportNodeConfig, serde_env::Erro
             std::env::remove_var(&key);
         }
     }
-    Ok(config)
+    config
+}
+
+fn default_max_times_retry_load_node_information() -> usize {
+    50
+}
+
+fn default_delay_retry_load_node_information() -> Duration {
+    Duration::from_secs(30)
 }
 
 /// Default bind address (`0.0.0.0:4321`) used when `TACEO_OPRF_NODE__BIND_ADDR` is not set.
 fn default_bind_addr() -> SocketAddr {
     "0.0.0.0:4321".parse().expect("valid SocketAddr")
+}
+
+async fn load_node_information(
+    secret_manager: &PostgresSecretManager,
+    max_times: usize,
+    delay: Duration,
+) -> eyre::Result<NodeInformation> {
+    let constant_backoff = ConstantBuilder::new()
+        .with_max_times(max_times)
+        .with_delay(delay);
+    (|| async { secret_manager.load_node_information().await })
+        .retry(constant_backoff)
+        .notify(|e: &eyre::Report, dur: Duration| {
+            tracing::warn!(?e, "Cannot load node information - retrying in {dur:?}");
+        })
+        .await
 }
 
 /// Core async runtime: loads config, starts services, runs the Axum server, and waits for shutdown.
@@ -68,6 +105,11 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
     tracing::info!("{}", taceo_nodes_common::version_info!());
 
     tracing::info!("starting oprf-node with config: {config:#?}");
+    tracing::info!(
+        "opening TCP listener for health probe on: {:?}",
+        config.bind_addr
+    );
+    let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;
 
     // Load the postgres secret manager.
     tracing::info!("connect to postgres secret-manager..");
@@ -80,13 +122,19 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
     let (cancellation_token, _) =
         taceo_nodes_common::spawn_shutdown_task(taceo_nodes_common::default_shutdown_signal());
 
-    // Clone the values we need afterwards
-    let bind_addr = config.bind_addr;
-
-    let node_information = secret_manager
-        .load_node_information()
-        .await
-        .context("while loading node information")?;
+    // load node information in a retry loop for GCP deployments.
+    // we wait for the cancellation token to catch shutdowns.
+    let node_information = tokio::select! {
+        result = load_node_information(
+            &secret_manager,
+            config.max_times_retry_load_node_information,
+            config.delay_retry_load_node_information,
+        ) => result.context("while loading node information")?,
+        () = cancellation_token.cancelled() => {
+            tracing::info!("shutdown requested while loading node information");
+            return Ok(());
+        }
+    };
 
     tracing::info!("loaded node-information: {node_information:#?}");
 
@@ -95,8 +143,7 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
         taceo_zkpassport_oprf_node::start(config.node_config, secret_manager, &node_information)?
             .layer(CatchPanicLayer::new());
 
-    tracing::info!("starting axum server on {bind_addr}",);
-    let listener = tokio::net::TcpListener::bind(bind_addr).await?;
+    tracing::info!("starting axum server");
     axum::serve(listener, oprf_service_router)
         .with_graceful_shutdown(async move { cancellation_token.cancelled().await })
         .await

@@ -19,9 +19,9 @@ publish = false
 
 [workspace.dependencies]
 alloy = { version = "2", default-features = false }
-ark-babyjubjub = { package = "taceo-ark-babyjubjub", version = "0.5.3" }
-ark-ff = "0.5"
-ark-serialize = "0.5"
+ark-babyjubjub = { package = "taceo-ark-babyjubjub", version = "0.6" }
+ark-ff = "0.6"
+ark-serialize = "0.6"
 # Pin axum to 0.8.8 to avoid pulling in tungstenite 0.29, which conflicts with the tungstenite version used by taceo_oprf upstream. The version mismatch breaks downcast_ref, causing errors to be misclassified.
 axum = "=0.8.8"
 backon = { version = "1.6", default-features = false }
@@ -36,13 +36,10 @@ ruint = "1.18.0"
 rustls = "0.23"
 serde = { version = "1" }
 serde_json = { version = "1" }
-taceo-nodes-common = { version = "0.7.4", default-features = false }
-taceo-oprf = { version = "0.17.2", default-features = false }
+taceo-nodes-common = { version = "0.9.0", default-features = false }
+taceo-oprf = { version = "0.18.2", default-features = false }
 telemetry-batteries = { version = "0.3.2", default-features = false }
-testcontainers = { version = "0.28", features = [
-  "host-port-exposure",
-  "http_wait_plain"
-] }
+testcontainers = { version = "0.28", features = ["host-port-exposure", "http_wait_plain"] }
 thiserror = { version = "2" }
 tikv-jemallocator = "0.7"
 tokio = { version = "1" }

@@ -42,6 +42,7 @@ pub struct ZkPassportNodeConfig {
 ///
 /// Used to build an [`backon::ExponentialBuilder`](https://docs.rs/backon/latest/backon/struct.ExponentialBuilder.html).
 #[derive(Clone, Copy, Debug, Deserialize)]
+#[non_exhaustive]
 pub struct RetryLayerConfig {
     /// Min interval for retry layer when encountering retryable errors during requests to the verifier oracle.
     #[serde(

@@ -17,3 +17,6 @@ ark-ff.workspace = true
 eyre.workspace = true
 taceo-oprf = { workspace = true, features = ["client", "core"] }
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
+
+[lints]
+workspace = true

@@ -6683,6 +6683,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "taceo-nodes-common"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b4168806bc8f2e5a7fe2210783ecdbc86a24c7678290113a4f143efa7f7ccbf"
+dependencies = [
+ "backon",
+ "git-version",
+ "humantime-serde",
+ "secrecy",
+ "serde",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "taceo-oprf"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6793,7 +6811,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "taceo-ark-babyjubjub",
- "taceo-nodes-common",
+ "taceo-nodes-common 0.7.4",
  "taceo-oprf-core",
  "taceo-oprf-types",
  "thiserror 2.0.20",
@@ -6898,7 +6916,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
- "taceo-nodes-common",
+ "taceo-nodes-common 0.9.0",
  "taceo-oprf",
  "taceo-zkpassport-oprf-authentication",
  "taceo-zkpassport-oprf-test-utils",

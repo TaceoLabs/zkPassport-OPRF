@@ -113,10 +113,7 @@ impl FaceMatchAuthenticator {
         Ok(Self {
             client,
             verify_url,
-            backon: ExponentialBuilder::new()
-                .with_min_delay(retry_layer.verifier_request_min_delay)
-                .with_max_delay(retry_layer.verifier_request_max_delay)
-                .with_max_times(retry_layer.verifier_request_max_attempts),
+            backon: retry_layer.exponential_backoff(),
         })
     }
 

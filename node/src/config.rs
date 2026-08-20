@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use backon::ExponentialBuilder;
 use reqwest::Url;
 use serde::Deserialize;
 use taceo_oprf::service::{VersionReq, config::OprfNodeServiceConfig};
@@ -28,7 +29,7 @@ pub struct ZkPassportNodeConfig {
     #[serde(with = "humantime_serde")]
     pub oracle_request_timeout: Duration,
 
-    /// The retry layer config for face-match auth module.
+    /// The retry layer config for requests to the verifier oracle.
     #[serde(rename = "retry")]
     #[serde(default)]
     pub face_match_retry_layer: RetryLayerConfig,
@@ -106,6 +107,13 @@ impl RetryLayerConfig {
             verifier_request_max_delay: Self::default_verifier_request_max_delay(),
             verifier_request_max_attempts: Self::default_verifier_request_max_attempts(),
         }
+    }
+
+    pub(crate) fn exponential_backoff(self) -> ExponentialBuilder {
+        ExponentialBuilder::new()
+            .with_min_delay(self.verifier_request_min_delay)
+            .with_max_delay(self.verifier_request_max_delay)
+            .with_max_times(self.verifier_request_max_attempts)
     }
 }
 

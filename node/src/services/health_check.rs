@@ -8,8 +8,8 @@
 //! # Behavior
 //!
 //! [`oracle_health_check_task`] runs forever in a `tokio::time::interval` loop.
-//! On each tick it calls [`oracle_health_check`], which performs a single
-//! `GET` to the configured URL and interprets the result.
+//! On each tick it calls [`oracle_health_check_with_retry`], which performs a
+//! `GET` to the configured URL and retries failures with exponential backoff.
 //!
 //! All reporting is via [`tracing`]; the task maintains no shared state and
 //! does not affect service startup or graceful shutdown.
@@ -25,9 +25,11 @@
 
 use std::time::Duration;
 
+use backon::{ExponentialBuilder, Retryable as _};
 use reqwest::{StatusCode, Url};
+use tokio::time::MissedTickBehavior;
 
-use crate::metrics;
+use crate::{config::RetryLayerConfig, metrics};
 
 #[derive(Debug, thiserror::Error)]
 enum HealthCheckError {
@@ -37,13 +39,19 @@ enum HealthCheckError {
     Unhealthy { status: StatusCode, body: String },
 }
 
-pub(crate) async fn oracle_health_check_task(health_interval: Duration, health_url: Url) {
+pub(crate) async fn oracle_health_check_task(
+    health_interval: Duration,
+    health_url: Url,
+    retry_layer: RetryLayerConfig,
+) {
     tracing::info!("spawning health check task");
     let mut interval = tokio::time::interval(health_interval);
+    interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    let backoff = retry_layer.exponential_backoff();
     loop {
         interval.tick().await;
 
-        match oracle_health_check(health_url.clone()).await {
+        match oracle_health_check_with_retry(&health_url, backoff).await {
             Ok(()) => {
                 metrics::oracle::healthy();
                 tracing::trace!("oracle healthy");
@@ -58,6 +66,21 @@ pub(crate) async fn oracle_health_check_task(health_interval: Duration, health_u
             }
         }
     }
+}
+
+async fn oracle_health_check_with_retry(
+    health_url: &Url,
+    backoff: ExponentialBuilder,
+) -> Result<(), HealthCheckError> {
+    (|| async { oracle_health_check(health_url.clone()).await })
+        .retry(backoff)
+        .notify(|err, duration| {
+            tracing::warn!(
+                ?err,
+                "Retrying oracle health check after {duration:?}: {err}"
+            );
+        })
+        .await
 }
 
 async fn oracle_health_check(health_url: Url) -> Result<(), HealthCheckError> {

@@ -55,6 +55,7 @@ pub fn start(
     tokio::task::spawn(health_check::oracle_health_check_task(
         config.oracle_health_check_interval,
         config.oracle_health_check_url,
+        config.face_match_retry_layer,
     ));
 
     tracing::info!("init oprf request auth service..");

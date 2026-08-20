@@ -154,10 +154,7 @@ impl DevClient for FaceMatchDevClient {
         let init_request = OprfRequest {
             request_id,
             blinded_query: blinded_query.blinded_query(),
-            auth: FaceMatchRequestAuth {
-                oprf_key_id: setup.oprf_key_id,
-                proofs: fixture.proofs,
-            },
+            auth: FaceMatchRequestAuth::new(setup.oprf_key_id, fixture.proofs),
         };
         Ok(StressTestItem {
             request_id,

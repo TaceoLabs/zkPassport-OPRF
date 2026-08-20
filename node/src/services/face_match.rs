@@ -287,10 +287,7 @@ mod tests {
         OprfRequest {
             request_id: Uuid::new_v4(),
             blinded_query: blinded_query.blinded_query(),
-            auth: FaceMatchRequestAuth {
-                oprf_key_id: OprfKeyId::new(U160::from(1)),
-                proofs: fixture.proofs,
-            },
+            auth: FaceMatchRequestAuth::new(OprfKeyId::new(U160::from(1)), fixture.proofs),
         }
     }
 
@@ -410,10 +407,7 @@ mod tests {
         let request = OprfRequest {
             request_id: Uuid::new_v4(),
             blinded_query: blinded_query.blinded_query(),
-            auth: FaceMatchRequestAuth {
-                oprf_key_id: OprfKeyId::new(U160::from(1)),
-                proofs: fixture.proofs,
-            },
+            auth: FaceMatchRequestAuth::new(OprfKeyId::new(U160::from(1)), fixture.proofs),
         };
 
         let is_err = auth_service()

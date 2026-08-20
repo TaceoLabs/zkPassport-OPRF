@@ -2,7 +2,7 @@
 //!
 //! Main entry point for the zkPassport OPRF service node. Loads configuration
 //! from environment variables using the `TACEO_OPRF_NODE__` prefix, initializes
-//! the PostgreSQL secret manager, and starts the Axum server with graceful
+//! the `PostgreSQL` secret manager, and starts the Axum server with graceful
 //! shutdown support.
 
 use std::{net::SocketAddr, process::ExitCode, sync::Arc, time::Duration};
@@ -59,7 +59,6 @@ fn load_zk_passport_config() -> Result<FullZkPassportNodeConfig, config::ConfigE
         .add_source(config::Environment::with_prefix("TACEO_OPRF_NODE").separator("__"));
     let config = cfg.build()?.try_deserialize()?;
     // Unset all env vars with our prefix to prevent leakage to subprocesses.
-    // Safety: this is called before any threads are spawned.
     let keys_to_remove: Vec<String> = std::env::vars()
         .filter_map(|(k, _)| k.starts_with("TACEO_OPRF_NODE").then_some(k))
         .collect();
@@ -188,7 +187,7 @@ fn main() -> ExitCode {
         };
 
         match run(config).await {
-            Ok(_) => {
+            Ok(()) => {
                 tracing::info!("good night");
                 ExitCode::SUCCESS
             }

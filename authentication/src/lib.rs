@@ -1,19 +1,3 @@
-#![deny(missing_docs)]
-#![deny(clippy::all, clippy::pedantic)]
-#![deny(
-    clippy::allow_attributes_without_reason,
-    clippy::assertions_on_result_states,
-    clippy::dbg_macro,
-    clippy::decimal_literal_representation,
-    clippy::iter_over_hash_type,
-    clippy::let_underscore_must_use,
-    clippy::missing_assert_message,
-    clippy::print_stderr,
-    clippy::print_stdout,
-    clippy::undocumented_unsafe_blocks,
-    clippy::unnecessary_safety_comment,
-    clippy::unwrap_used
-)]
 //! Authentication types for the zkPassport OPRF service.
 //!
 //! This crate defines the types and error handling used to authenticate
@@ -37,6 +21,7 @@ use taceo_oprf::types::{
 
 /// Identifies the authentication module used for an OPRF request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AuthModules {
     /// Face-match authentication using zkPassport zero-knowledge proofs.
     FaceMatch,
@@ -54,6 +39,7 @@ impl core::fmt::Display for AuthModules {
 /// forwards the embedded proofs to the oracle for verification before
 /// proceeding with the OPRF evaluation.
 #[derive(Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct FaceMatchRequestAuth {
     /// The OPRF key to use for this request.
     pub oprf_key_id: OprfKeyId,
@@ -61,9 +47,21 @@ pub struct FaceMatchRequestAuth {
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
+impl FaceMatchRequestAuth {
+    /// Creates a new `FaceMatchRequestAuth`.
+    #[must_use]
+    pub fn new(oprf_key_id: OprfKeyId, proofs: Vec<ZKPassportProofResult>) -> Self {
+        Self {
+            oprf_key_id,
+            proofs,
+        }
+    }
+}
+
 /// A single zkPassport proof, matching the `ProofResult` type from `@zkpassport/utils`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ZKPassportProofResult {
     /// The serialized ZK proof string (base64 or hex, as produced by the prover).
     #[serde(default, skip_serializing_if = "Option::is_none")]

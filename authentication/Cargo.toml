@@ -16,3 +16,6 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 taceo-oprf = { workspace = true, features = ["types"] }
 thiserror.workspace = true
+
+[lints]
+workspace = true

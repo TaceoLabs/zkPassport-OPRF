@@ -45,9 +45,10 @@ zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authenticati
 ruint.workspace = true
 taceo-oprf = { workspace = true, features = ["core", "postgres", "service"] }
 uuid = { workspace = true, features = ["serde", "v4"] }
-zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1", features = [
-  "containers"
-] }
+zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1", features = ["containers"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator.workspace = true
+
+[lints]
+workspace = true

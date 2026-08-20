@@ -1,19 +1,3 @@
-#![deny(missing_docs)]
-#![deny(clippy::all, clippy::pedantic)]
-#![deny(
-    clippy::allow_attributes_without_reason,
-    clippy::assertions_on_result_states,
-    clippy::dbg_macro,
-    clippy::decimal_literal_representation,
-    clippy::iter_over_hash_type,
-    clippy::let_underscore_must_use,
-    clippy::missing_assert_message,
-    clippy::print_stderr,
-    clippy::print_stdout,
-    clippy::undocumented_unsafe_blocks,
-    clippy::unnecessary_safety_comment,
-    clippy::unwrap_used
-)]
 //! Client library for zkPassport's instance of TACEO:OPRF.
 //!
 //! This crate wraps the upstream [`taceo_oprf::client`] functionality and
@@ -69,10 +53,7 @@ pub async fn face_match_oprf(
     beta: ark_babyjubjub::Fr,
     connector: Connector,
 ) -> eyre::Result<VerifiableOprfOutput> {
-    let auth = FaceMatchRequestAuth {
-        oprf_key_id,
-        proofs,
-    };
+    let auth = FaceMatchRequestAuth::new(oprf_key_id, proofs);
     let blinding_factor = BlindingFactor::from_scalar(beta).context("Invalid blinding factor")?;
     let ds = ark_babyjubjub::Fq::from_be_bytes_mod_order(ZKPASSPORT_OPRF_DS);
 

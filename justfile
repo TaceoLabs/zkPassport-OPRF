@@ -10,7 +10,7 @@ lint:
     RUSTDOCFLAGS='-D warnings' cargo doc --workspace -q --no-deps --document-private-items
 
 [group('ci')]
-check-pr: lint all-tests
+check-pr: lint all-tests cargo-deny
 
 [group('test')]
 rust-tests:
@@ -30,3 +30,7 @@ run-setup:
 [group('deploy')]
 run-dev-client *args:
     cargo run --bin taceo-zkpassport-dev-client {{ args }}
+
+[group('ci')]
+cargo-deny:
+    cargo deny check

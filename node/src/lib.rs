@@ -63,6 +63,7 @@ pub fn start(
     config: ZkPassportNodeConfig,
     secret_manager: SecretManagerService,
     node_information: &NodeInformation,
+    version_str: String,
 ) -> eyre::Result<axum::Router> {
     let node_config = config.node_config;
     let started_services = StartedServices::default();
@@ -88,6 +89,7 @@ pub fn start(
         secret_manager,
         started_services.clone(),
         node_information,
+        version_str,
     )
     .cors_for_info()
     .module(

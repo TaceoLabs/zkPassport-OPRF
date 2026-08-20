@@ -14,7 +14,7 @@
 
 use std::num::NonZeroUsize;
 
-use alloy::{primitives::U160, providers::DynProvider};
+use alloy::{primitives::U160, providers::DynProvider, transports::http::reqwest};
 use clap::Parser;
 use eyre::Context;
 use rand::{CryptoRng, Rng};
@@ -173,5 +173,15 @@ impl DevClient for FaceMatchDevClient {
 
     fn get_oprf_key_id(&self, setup: &Self::Setup) -> OprfKeyId {
         setup.oprf_key_id
+    }
+
+    async fn run_delegate_oprf(
+        &self,
+        _config: &DevClientConfig,
+        _setup: Self::Setup,
+        _delegate_service: Option<String>,
+        _client: &reqwest::Client,
+    ) -> eyre::Result<ShareEpoch> {
+        eyre::bail!("Delegate pattern not supported for zkPassport dev-client")
     }
 }

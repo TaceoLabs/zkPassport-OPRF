@@ -29,10 +29,11 @@ pub struct ZkPassportNodeConfig {
     #[serde(with = "humantime_serde")]
     pub oracle_request_timeout: Duration,
 
-    /// The retry layer config for requests to the verifier oracle.
+    /// The retry layer config for requests to the verifier oracle, used by
+    /// both the face-match verify requests and the health-check task.
     #[serde(rename = "retry")]
     #[serde(default)]
-    pub face_match_retry_layer: RetryLayerConfig,
+    pub oracle_retry_layer: RetryLayerConfig,
 
     /// The OPRF service config
     #[serde(rename = "oprf")]
@@ -70,7 +71,7 @@ impl ZkPassportNodeConfig {
     }
 
     fn default_oracle_request_timeout() -> Duration {
-        Duration::from_secs(10)
+        Duration::from_secs(25)
     }
 }
 
@@ -114,6 +115,7 @@ impl RetryLayerConfig {
             .with_min_delay(self.verifier_request_min_delay)
             .with_max_delay(self.verifier_request_max_delay)
             .with_max_times(self.verifier_request_max_attempts)
+            .with_jitter()
     }
 }
 
@@ -131,7 +133,7 @@ impl ZkPassportNodeConfig {
             oracle_verifier_url,
             oracle_health_check_interval: Self::default_oracle_health_check_interval(),
             oracle_request_timeout: Self::default_oracle_request_timeout(),
-            face_match_retry_layer: RetryLayerConfig::with_default_values(),
+            oracle_retry_layer: RetryLayerConfig::with_default_values(),
             node_config: OprfNodeServiceConfig::with_default_values(environment, version_req),
         }
     }

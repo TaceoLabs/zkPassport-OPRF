@@ -67,7 +67,7 @@ jobs:
       # Using https://github.com/marketplace/actions/docker-metadata-action
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v6.1.0
+        uses: docker/metadata-action@v6.2.0
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -208,7 +208,7 @@ jobs:
       # Using https://github.com/marketplace/actions/docker-metadata-action
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v6.1.0
+        uses: docker/metadata-action@v6.2.0
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}

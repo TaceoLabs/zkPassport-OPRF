@@ -172,7 +172,7 @@ fn is_retryable_error(e: &FaceMatchAuthError) -> bool {
     //
     // we do not retry INTERNAL SERVER ERROR
     match e {
-        FaceMatchAuthError::OracleNotReachable(error) => error.is_connect(),
+        FaceMatchAuthError::OracleNotReachable(error) => error.is_timeout() || error.is_connect(),
         FaceMatchAuthError::UnexpectedStatusCode { status, .. } => matches!(
             *status,
             StatusCode::REQUEST_TIMEOUT

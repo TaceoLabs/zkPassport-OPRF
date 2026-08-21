@@ -52,21 +52,25 @@ pub fn start(
     let node_config = config.node_config;
     let started_services = StartedServices::default();
 
+    // we use the client-builder to avoid panic if we cannot install tls backend
+    let oracle_client = reqwest::ClientBuilder::new()
+        .timeout(config.oracle_request_timeout)
+        .build()
+        .context("while building reqwest client")?;
+
     tokio::task::spawn(health_check::oracle_health_check_task(
+        oracle_client.clone(),
         config.oracle_health_check_interval,
         config.oracle_health_check_url,
-        config.face_match_retry_layer,
+        config.oracle_retry_layer,
     ));
 
     tracing::info!("init oprf request auth service..");
-    let oprf_req_auth_service = Arc::new(
-        FaceMatchAuthenticator::init(
-            config.oracle_verifier_url,
-            config.oracle_request_timeout,
-            config.face_match_retry_layer,
-        )
-        .context("while spawning authenticator")?,
-    );
+    let oprf_req_auth_service = Arc::new(FaceMatchAuthenticator::init(
+        oracle_client,
+        config.oracle_verifier_url,
+        config.oracle_retry_layer,
+    ));
 
     tracing::info!("init oprf service..");
     let router = taceo_oprf::service::OprfServiceBuilder::init(

@@ -102,7 +102,7 @@ setup() {
     teardown
     trap teardown EXIT SIGINT SIGTERM
 
-    docker compose -f ./deploy/local/docker-compose.yml up -d postgres anvil proof-verifier
+    docker compose -f ./deploy/local/docker-compose.yml up -d postgres anvil
 
     # wait for anvil to be healthy before proceeding
     while true; do
@@ -116,13 +116,6 @@ setup() {
     done
     echo -e "${GREEN}deploying contracts..${NOCOLOR}"
     deploy_contracts
-
-    wait_for_health 8080 "proof-verifier" 300
-
-    echo -e "${GREEN}starting OPRF nodes..${NOCOLOR}"
-    start_node 0
-    start_node 1
-    start_node 2
 
     echo -e "${GREEN}starting OPRF key-gen nodes..${NOCOLOR}"
     TACEO_OPRF_KEY_GEN__SERVICE__OPRF_KEY_REGISTRY_CONTRACT=$oprf_key_registry \
@@ -139,6 +132,11 @@ setup() {
     docker compose -f ./deploy/local/docker-compose.yml up -d proof-verifier
     docker compose -f ./deploy/local/docker-compose.yml logs -f --no-log-prefix proof-verifier > logs/proof-verifier.log 2>&1 &
     wait_for_health 8080 "proof-verifier" 60
+    
+    echo -e "${GREEN}starting OPRF nodes..${NOCOLOR}"
+    start_node 0
+    start_node 1
+    start_node 2
 
     wait_for_health 10000 "taceo-zkpassport-oprf-node0" 300
     wait_for_health 10001 "taceo-zkpassport-oprf-node1" 300

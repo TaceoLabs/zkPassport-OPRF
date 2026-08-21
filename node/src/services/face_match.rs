@@ -1,10 +1,8 @@
 use std::fmt::Write as _;
-use std::time::Duration;
 
 use ark_serialize::CanonicalSerialize;
 use backon::{ExponentialBuilder, Retryable as _};
-use eyre::Context as _;
-use reqwest::{ClientBuilder, StatusCode, Url};
+use reqwest::{StatusCode, Url};
 use serde::ser::Error;
 
 use serde::{Deserialize, Serialize, Serializer};
@@ -92,46 +90,28 @@ pub struct FaceMatchAuthenticator {
 impl FaceMatchAuthenticator {
     /// Initialize the authenticator.
     ///
-    /// Builds an HTTP client and stores the `verify_url` used for subsequent
+    /// Stores the HTTP client and the `verify_url` used for subsequent
     /// proof-verification requests. Oracle reachability is not checked here; a
     /// separate background task polls the oracle's health endpoint (see
     /// [`crate::services::health_check`]).
-    ///
-    /// # Errors
-    /// Returns an error if the HTTP client cannot be built.
-    pub fn init(
-        verify_url: Url,
-        request_timeout: Duration,
-        retry_layer: RetryLayerConfig,
-    ) -> eyre::Result<Self> {
-        // we use the client-builder to avoid panic if we cannot install tls backend
-        let client = ClientBuilder::new()
-            .timeout(request_timeout)
-            .build()
-            .context("while building reqwest client")?;
-
-        Ok(Self {
+    pub fn init(client: reqwest::Client, verify_url: Url, retry_layer: RetryLayerConfig) -> Self {
+        Self {
             client,
             verify_url,
             backon: retry_layer.exponential_backoff(),
-        })
+        }
     }
 
     /// Send the OPRF request's blinded query and proofs to the oracle and return the key ID.
     async fn authenticate_inner(
         &self,
-        request: &OprfRequest<FaceMatchRequestAuth>,
-    ) -> Result<OprfKeyId, FaceMatchAuthError> {
-        let body = OracleVerifyRequest {
-            blinded_unique_identifier: request.blinded_query,
-            proofs: request.auth.proofs.clone(),
-        };
-
+        request: &OracleVerifyRequest,
+    ) -> Result<(), FaceMatchAuthError> {
         tracing::trace!("sending verify request to oracle: {}", self.verify_url);
         let response = self
             .client
             .post(self.verify_url.clone())
-            .json(&body)
+            .json(&request)
             .send()
             .await?;
 
@@ -139,7 +119,7 @@ impl FaceMatchAuthenticator {
 
         if status == StatusCode::OK {
             tracing::trace!("oracle verified proofs successfully");
-            Ok(request.auth.oprf_key_id)
+            Ok(())
         } else if status == StatusCode::BAD_REQUEST {
             tracing::trace!("received BAD REQUEST from oracle");
             let body = response.text().await?;
@@ -172,7 +152,7 @@ fn is_retryable_error(e: &FaceMatchAuthError) -> bool {
     //
     // we do not retry INTERNAL SERVER ERROR
     match e {
-        FaceMatchAuthError::OracleNotReachable(error) => error.is_timeout() || error.is_connect(),
+        FaceMatchAuthError::OracleNotReachable(error) => error.is_connect(),
         FaceMatchAuthError::UnexpectedStatusCode { status, .. } => matches!(
             *status,
             StatusCode::REQUEST_TIMEOUT
@@ -194,18 +174,20 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
-        (|| async { self.authenticate_inner(request).await })
+        let auth_body = OracleVerifyRequest {
+            blinded_unique_identifier: request.blinded_query,
+            proofs: request.auth.proofs.clone(),
+        };
+        (|| async { self.authenticate_inner(&auth_body).await })
             .retry(self.backon)
             .when(is_retryable_error)
             .notify(|err, duration| {
-                tracing::warn!(
-                    ?err,
-                    "Retrying request to verifier oracle in db after {duration:?}: {err}"
-                );
+                tracing::warn!(?err, retry_in = ?duration, "retrying request to verifier oracle");
             })
             .await
             .inspect_err(FaceMatchAuthError::log)
-            .map_err(|err| AuthErrorKind::from(err).into())
+            .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))?;
+        Ok(request.auth.oprf_key_id)
     }
 }
 
@@ -266,14 +248,20 @@ mod tests {
 
     use crate::{config::RetryLayerConfig, services::face_match::FaceMatchAuthenticator};
 
+    fn test_client() -> eyre::Result<reqwest::Client> {
+        Ok(reqwest::ClientBuilder::new()
+            .timeout(Duration::from_secs(10))
+            .build()?)
+    }
+
     async fn auth_service() -> eyre::Result<FaceMatchAuthenticator> {
         let proof_verifier_url =
             zkpassport_oprf_test_utils::containers::get_proof_verifier_url().await;
-        FaceMatchAuthenticator::init(
+        Ok(FaceMatchAuthenticator::init(
+            test_client()?,
             proof_verifier_url.join("verify-oprf-auth?devmode=true")?,
-            Duration::from_secs(10),
             RetryLayerConfig::disabled(),
-        )
+        ))
     }
 
     fn build_request(fixture: FixtureData) -> OprfRequest<FaceMatchRequestAuth> {
@@ -426,10 +414,10 @@ mod tests {
         // Port 1 on loopback is never open; any connection attempt immediately
         // returns ECONNREFUSED without waiting for a timeout.
         let auth_service = FaceMatchAuthenticator::init(
+            test_client()?,
             "http://127.0.0.1:1/verify-oprf-auth".parse()?,
-            Duration::from_secs(10),
             RetryLayerConfig::disabled(),
-        )?;
+        );
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);
 

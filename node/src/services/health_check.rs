@@ -40,6 +40,7 @@ enum HealthCheckError {
 }
 
 pub(crate) async fn oracle_health_check_task(
+    client: reqwest::Client,
     health_interval: Duration,
     health_url: Url,
     retry_layer: RetryLayerConfig,
@@ -51,7 +52,7 @@ pub(crate) async fn oracle_health_check_task(
     loop {
         interval.tick().await;
 
-        match oracle_health_check_with_retry(&health_url, backoff).await {
+        match oracle_health_check_with_retry(&client, &health_url, backoff).await {
             Ok(()) => {
                 metrics::oracle::healthy();
                 tracing::trace!("oracle healthy");
@@ -69,22 +70,23 @@ pub(crate) async fn oracle_health_check_task(
 }
 
 async fn oracle_health_check_with_retry(
+    client: &reqwest::Client,
     health_url: &Url,
     backoff: ExponentialBuilder,
 ) -> Result<(), HealthCheckError> {
-    (|| async { oracle_health_check(health_url.clone()).await })
+    (|| async { oracle_health_check(client, health_url).await })
         .retry(backoff)
         .notify(|err, duration| {
-            tracing::warn!(
-                ?err,
-                "Retrying oracle health check after {duration:?}: {err}"
-            );
+            tracing::warn!(?err, retry_in = ?duration, "retrying oracle health check");
         })
         .await
 }
 
-async fn oracle_health_check(health_url: Url) -> Result<(), HealthCheckError> {
-    let response = reqwest::get(health_url.clone()).await?;
+async fn oracle_health_check(
+    client: &reqwest::Client,
+    health_url: &Url,
+) -> Result<(), HealthCheckError> {
+    let response = client.get(health_url.clone()).send().await?;
     let status = response.status();
     if status == StatusCode::OK {
         Ok(())

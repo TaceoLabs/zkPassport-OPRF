@@ -99,44 +99,44 @@ jobs:
           build-args: |
             GIT_HASH=${{ github.sha }}
 
-      # - name: Select scan image
-      #   id: scan-image
-      #   shell: bash
-      #   run: |
-      #     scan_image="$(printf '%s\n' '${{ steps.meta.outputs.tags }}' | head -n1)"
-      #     if [[ -z "$scan_image" ]]; then
-      #       echo "No Docker tags were generated" >&2
-      #       exit 1
-      #     fi
-      #     echo "image=$scan_image" >> "$GITHUB_OUTPUT"
-      #
-      # - name: Generate SBOM
-      #   uses: anchore/sbom-action@v0
-      #   with:
-      #     image: ${{ steps.scan-image.outputs.image }}
-      #     format: spdx-json
-      #     artifact-name: ${{ inputs.image-name }}-${{ matrix.arch }}-sbom.spdx.json
-      #     output-file: ${{ runner.temp }}/${{ matrix.arch }}-sbom.spdx.json
-      #     upload-artifact: true
-      #
-      # - name: Run vulnerability scan
-      #   uses: anchore/scan-action@v7
-      #   with:
-      #     sbom: ${{ runner.temp }}/${{ matrix.arch }}-sbom.spdx.json
-      #     fail-build: false
-      #     output-format: table
-      #     severity-cutoff: critical
-      #     output-file: vuln-report.out
-      #
-      # - name: Summarize vulnerability report
-      #   if: always()
-      #   run: |
-      #     {
-      #       echo "# Vulnerability Report Summary"
-      #       echo '```'
-      #       cat vuln-report.out
-      #       echo '```'
-      #     } >> $GITHUB_STEP_SUMMARY
+      - name: Select scan image
+        id: scan-image
+        shell: bash
+        run: |
+          scan_image="$(printf '%s\n' '${{ steps.meta.outputs.tags }}' | head -n1)"
+          if [[ -z "$scan_image" ]]; then
+            echo "No Docker tags were generated" >&2
+            exit 1
+          fi
+          echo "image=$scan_image" >> "$GITHUB_OUTPUT"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.scan-image.outputs.image }}
+          format: spdx-json
+          artifact-name: ${{ inputs.image-name }}-${{ matrix.arch }}-sbom.spdx.json
+          output-file: ${{ runner.temp }}/${{ matrix.arch }}-sbom.spdx.json
+          upload-artifact: true
+
+      - name: Run vulnerability scan
+        uses: anchore/scan-action@v7
+        with:
+          sbom: ${{ runner.temp }}/${{ matrix.arch }}-sbom.spdx.json
+          fail-build: false
+          output-format: table
+          severity-cutoff: critical
+          output-file: vuln-report.out
+
+      - name: Summarize vulnerability report
+        if: always()
+        run: |
+          {
+            echo "# Vulnerability Report Summary"
+            echo '```'
+            cat vuln-report.out
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Push image tags
         id: push-image

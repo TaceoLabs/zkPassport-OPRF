@@ -3,6 +3,9 @@ name: Build and Push (zkPassport OPRF-node)
 on:
   workflow_dispatch:
   push:
+    branches:
+      # TODO: remove before merging
+      - 'sg/enable_vuln_rep'
     tags:
       - 'zkpassport-oprf-node-v*'
 

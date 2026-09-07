@@ -30,10 +30,10 @@ jobs:
     continue-on-error: ${{ matrix.checks == 'advisories' }}
 
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master
         with:
           toolchain: stable
-      - uses: taiki-e/install-action@cargo-deny
+      - uses: taiki-e/install-action@0e157e9195cec1bb5209ef13b56c90507021242a # cargo-deny
       - name: Run cargo-deny
         run: cargo deny --log-level error --all-features check ${{ matrix.checks }}

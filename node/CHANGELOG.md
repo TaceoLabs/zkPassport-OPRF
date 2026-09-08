@@ -1,5 +1,70 @@
 # Changelog
 
+## [1.0.4]
+
+Version bump only: released alongside the first `taceo-zkpassport-oprf-authentication` release. No changes to the node crate itself.
+
+## [1.0.3]
+
+### ⛰️ Features
+
+
+- Add retry logic for health check - ([677a9cc](https://github.com/TaceoLabs/zkPassport-OPRF/commit/677a9ccfecaf36f3e44bb1f19b066c3274eaaa01))
+
+### 🐛 Bug Fixes
+
+
+- *(node)* Increased timeout for oracle and added jitter - ([689ae20](https://github.com/TaceoLabs/zkPassport-OPRF/commit/689ae20f0cd68b12bb5a795e4ab20f52e8f3ccbe))
+
+### 🚜 Refactor
+
+
+- *(clippy)* Moved lints to Cargo.toml and enforced default taceo prod lints - ([ef6a07a](https://github.com/TaceoLabs/zkPassport-OPRF/commit/ef6a07a7abad5416aecc2cbbfeb134eecb1ce762))
+- *(node)* Reuse reqwest client - ([1a1c8dc](https://github.com/TaceoLabs/zkPassport-OPRF/commit/1a1c8dc745bac89990df350cee5b0ce5d08d36f4))
+
+### 🏗️ Build
+
+
+- *(deps)* Bump to latest taceo versions - ([7c15250](https://github.com/TaceoLabs/zkPassport-OPRF/commit/7c152507084120cd6b6199006dca801ca950efd6))
+
+### ⚙️ Miscellaneous Tasks
+
+
+- Bump node to version 1.0.3 - ([84c76dd](https://github.com/TaceoLabs/zkPassport-OPRF/commit/84c76dd436d404f8c2e6c0e44970673582f02c17))
+
+## [1.0.2]
+
+### 🚜 Refactor
+
+
+- *(node)* Use config over serde_env ([#131](https://github.com/TaceoLabs/zkPassport-OPRF/pull/131)) - ([ba6037c](https://github.com/TaceoLabs/zkPassport-OPRF/commit/ba6037c2a25d3d017d199853c1f18b94b0d81e78))
+
+## [1.0.1]
+
+### ⛰️ Features
+
+
+- *(node)* Retry load information instead of crashing early - ([da64f1e](https://github.com/TaceoLabs/zkPassport-OPRF/commit/da64f1e10e8c002d5d9335333eba4a0524ebfd86))
+- *(node)* Add retry layer when sending request to verifier - ([8770c04](https://github.com/TaceoLabs/zkPassport-OPRF/commit/8770c0499a88653ca0238760c2e3c1fa2108743c))
+- *(node)* Add catch panic layer ([#99](https://github.com/TaceoLabs/zkPassport-OPRF/pull/99)) - ([3bdc78f](https://github.com/TaceoLabs/zkPassport-OPRF/commit/3bdc78fc20855c27fccf2a3bf8c6275ae456badf))
+
+### 🚜 Refactor
+
+
+- *(node)* Use serde_env over config - ([439aa2d](https://github.com/TaceoLabs/zkPassport-OPRF/commit/439aa2d3e525334192626a324cc5fd34e50f024f))
+- Remove cancellation token in start and bump taceo:oprf 0.17.1 - ([b649afa](https://github.com/TaceoLabs/zkPassport-OPRF/commit/b649afa4797132a3ad15a3359344a81ab27f98d5))
+
+### 🏗️ Build
+
+
+- *(deps)* Use default-tls ([#101](https://github.com/TaceoLabs/zkPassport-OPRF/pull/101)) - ([c1eb8d4](https://github.com/TaceoLabs/zkPassport-OPRF/commit/c1eb8d4da9805dfa4a7edfc191512b43931c3837))
+
+### ⚙️ Miscellaneous Tasks
+
+
+- Error logging clarity ([#102](https://github.com/TaceoLabs/zkPassport-OPRF/pull/102)) - ([2584772](https://github.com/TaceoLabs/zkPassport-OPRF/commit/258477245a8d13e1838c658d99da5ada312e6078))
+- Set publish of node to git_only - ([3049ad7](https://github.com/TaceoLabs/zkPassport-OPRF/commit/3049ad7a6fa55e646fe837073e5ee62bbc9a5b3c))
+
 ## [1.0.0]
 
 ### ⛰️ Features

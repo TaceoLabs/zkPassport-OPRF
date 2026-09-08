@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.4]
+
+### 🌀 Other
+
+
+- Release - ([1e088d9](https://github.com/TaceoLabs/zkPassport-OPRF/commit/1e088d9335c8138477a30274f3e2b7e8eb02dab2))
+
+
 ## [1.0.0]
 
 ### ⛰️ Features

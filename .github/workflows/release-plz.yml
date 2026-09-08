@@ -7,11 +7,6 @@ on:
 
 permissions: {}
 
-env:
-  # Release of the TaceoLabs release-plz fork to use:
-  # https://github.com/TaceoLabs/release-plz/releases
-  RELEASE_PLZ_TAG: release-plz-v0.3.162-taceo.1
-
 jobs:
   release-plz-release:
     name: Release-plz release
@@ -32,15 +27,6 @@ jobs:
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           toolchain: stable
-      - &install-release-plz
-        name: Install release-plz
-        run: |
-          set -euo pipefail
-          url="https://github.com/TaceoLabs/release-plz/releases/download/${RELEASE_PLZ_TAG}/release-plz-x86_64-unknown-linux-gnu.tar.gz"
-          mkdir -p "${RUNNER_TEMP}/release-plz"
-          curl -fsSL "${url}" | tar -xz -C "${RUNNER_TEMP}/release-plz"
-          echo "${RUNNER_TEMP}/release-plz" >> "${GITHUB_PATH}"
-          "${RUNNER_TEMP}/release-plz/release-plz" --version
       # PRs and tags created with an app token trigger other workflows,
       # which the default GITHUB_TOKEN does not.
       - name: Generate GitHub App token
@@ -50,14 +36,12 @@ jobs:
           app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
           private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
           permission-contents: write
-      - name: Configure git user from GitHub token
-        uses: release-plz/git-config@59144859caf016f8b817a2ac9b051578729173c4
+      - name: Run release-plz
+        uses: TaceoLabs/release-plz-action@fca5bd06a8e7d289ba4d22e2d3f09da5129d3455 # fork-binary
+        with:
+          command: release
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
-      - name: Run release-plz release
-        env:
-          GIT_TOKEN: ${{ steps.generate-token.outputs.token }}
-        run: release-plz release
 
   release-plz-pr:
     name: Release-plz PR
@@ -71,7 +55,6 @@ jobs:
     steps:
       - *checkout
       - *install-rust
-      - *install-release-plz
       - name: Generate GitHub App token
         id: generate-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -80,13 +63,9 @@ jobs:
           private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
-      - name: Configure git user from GitHub token
-        uses: release-plz/git-config@59144859caf016f8b817a2ac9b051578729173c4
+      - name: Run release-plz
+        uses: TaceoLabs/release-plz-action@fca5bd06a8e7d289ba4d22e2d3f09da5129d3455 # fork-binary
+        with:
+          command: release-pr
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
-      - name: Run release-plz release-pr
-        env:
-          GIT_TOKEN: ${{ steps.generate-token.outputs.token }}
-        run: |
-          release-plz release-pr \
-            --repo-url "https://github.com/${GITHUB_REPOSITORY}"

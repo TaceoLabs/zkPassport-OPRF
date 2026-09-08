@@ -48,6 +48,7 @@ jobs:
   release-plz-pr:
     name: Release-plz PR
     runs-on: ubuntu-latest
+    needs: release-plz-release
     if: ${{ github.repository_owner == 'TaceoLabs' }}
     permissions:
       contents: read

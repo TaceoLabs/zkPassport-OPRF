@@ -2,6 +2,7 @@
 git_only = true
 publish = false
 release_always = false
+release_commits = "^(feat|fix|perf|refactor|build|revert|doc|chore: update Cargo\\.(toml|lock) dependencies)"
 # Only the node produces a deployable artifact, so it is the only crate with a GitHub release.
 git_release_enable = false
 git_tag_name = "{{ package }}-v{{ version }}"
@@ -66,9 +67,10 @@ commit_parsers = [
   { body = ".*security", group = "<!-- 08 -->🛡️ Security" },
   { message = "^revert", group = "<!-- 09 -->◀️ Revert" },
   { message = "^ci", skip = true },
-  # Catches `chore:` commits (including release-plz's own synthetic ones for workspace
-  # dependency bumps and packages pulled forward by a local path dependency release) and
-  # anything else non-conventional.
+  { message = "^chore: update Cargo\\.(toml|lock) dependencies", group = "<!-- 03 -->🏗️ Build" },
+  { message = "^chore: release", skip = true },
+  # Catches remaining `chore:` commits (including release-plz's synthetic one for packages pulled
+  # forward by a local path dependency release) and anything else non-conventional.
   { message = ".*", group = "<!-- 10 -->🌀 Other" },
 ]
 

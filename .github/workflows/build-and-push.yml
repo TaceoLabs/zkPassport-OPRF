@@ -77,8 +77,8 @@ jobs:
 
           tags: |
             type=sha,format=long
-            type=match,pattern=^${{ inputs.image-name }}-(v\d+\.\d+\.\d+.*)$,group=1
-            type=match,pattern=^${{ inputs.image-name }}-(v\d+\.\d+\.\d+)-(dev).*$,group=2
+            type=match,pattern=^taceo-${{ inputs.image-name }}-(v\d+\.\d+\.\d+.*)$,group=1
+            type=match,pattern=^taceo-${{ inputs.image-name }}-(v\d+\.\d+\.\d+)-(dev).*$,group=2
 
           labels: |
             org.opencontainers.image.title=${{ inputs.image-name }}
@@ -220,8 +220,8 @@ jobs:
 
           tags: |
             type=sha,format=long
-            type=match,pattern=^${{ inputs.image-name }}-(v\d+\.\d+\.\d+.*)$,group=1
-            type=match,pattern=^${{ inputs.image-name }}-(v\d+\.\d+\.\d+)-(dev).*$,group=2
+            type=match,pattern=^taceo-${{ inputs.image-name }}-(v\d+\.\d+\.\d+.*)$,group=1
+            type=match,pattern=^taceo-${{ inputs.image-name }}-(v\d+\.\d+\.\d+)-(dev).*$,group=2
 
           labels: |
             org.opencontainers.image.title=${{ inputs.image-name }}

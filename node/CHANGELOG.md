@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.5](https://github.com/TaceoLabs/zkPassport-OPRF/compare/taceo-zkpassport-oprf-node-v1.0.4...taceo-zkpassport-oprf-node-v1.0.5)
+
+### 📚 Documentation
+
+
+- Update changelog for node - ([a644291](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a6442917cadb12f13106c72cfc9cf462ee77f1db))
+
+
 ## [1.0.4]
 
 Version bump only: released alongside the first `taceo-zkpassport-oprf-authentication` release. No changes to the node crate itself.

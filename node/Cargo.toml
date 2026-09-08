@@ -9,7 +9,7 @@ homepage.workspace = true
 repository.workspace = true
 license.workspace = true
 keywords = ["cryptography", "mpc", "oprf"]
-publish = ["github-only"]
+publish.workspace = true
 
 [dependencies]
 ark-serialize.workspace = true

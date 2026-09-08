@@ -60,22 +60,15 @@ body = """
 commit_parsers = [
   { message = "^feat", group = "<!-- 0 -->⛰️ Features" },
   { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
-  { message = "^refactor\\(clippy\\)", skip = true },
   { message = "^refactor", group = "<!-- 2 -->🚜 Refactor" },
   { message = "^build", group = "<!-- 3 -->🏗️ Build" },
   { message = "^doc", group = "<!-- 4 -->📚 Documentation" },
   { message = "^perf", group = "<!-- 5 -->⚡ Performance" },
   { message = "^style", group = "<!-- 6 -->🎨 Styling" },
   { message = "^test", group = "<!-- 7 -->🧪 Testing" },
-  { message = "^chore\\(release\\):", skip = true },
-  { message = "^chore: release", skip = true },
-  { message = "^chore\\(deps.*\\)", skip = true },
-  { message = "^chore\\(pr\\)", skip = true },
-  { message = "^chore\\(pull\\)", skip = true },
-  { message = "^chore\\(npm\\).*yarn\\.lock", skip = true },
-  { message = "^chore|^ci", group = "<!-- 8 -->⚙️ Miscellaneous Tasks" },
-  { body = ".*security", group = "<!-- 9 -->🛡️ Security" },
-  { message = "^revert", group = "<!-- 10 -->◀️ Revert" },
+  { body = ".*security", group = "<!-- 8 -->🛡️ Security" },
+  { message = "^revert", group = "<!-- 9 -->◀️ Revert" },
+  { message = "^chore|^ci", skip = true },
 ]
 
 link_parsers = [

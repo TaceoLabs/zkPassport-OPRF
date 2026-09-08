@@ -55,18 +55,20 @@ body = """
 """
 
 commit_parsers = [
-  { message = "^feat", group = "<!-- 0 -->⛰️ Features" },
-  { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
-  { message = "^refactor", group = "<!-- 2 -->🚜 Refactor" },
-  { message = "^build", group = "<!-- 3 -->🏗️ Build" },
-  { message = "^chore: update Cargo\\.(toml|lock) dependencies", group = "<!-- 3 -->🏗️ Build" },
-  { message = "^doc", group = "<!-- 4 -->📚 Documentation" },
-  { message = "^perf", group = "<!-- 5 -->⚡ Performance" },
-  { message = "^style", group = "<!-- 6 -->🎨 Styling" },
-  { message = "^test", group = "<!-- 7 -->🧪 Testing" },
-  { body = ".*security", group = "<!-- 8 -->🛡️ Security" },
-  { message = "^revert", group = "<!-- 9 -->◀️ Revert" },
-  { message = "^chore|^ci", skip = true },
+  { message = "^feat", group = "<!-- 00 -->⛰️ Features" },
+  { message = "^fix", group = "<!-- 01 -->🐛 Bug Fixes" },
+  { message = "^refactor", group = "<!-- 02 -->🚜 Refactor" },
+  { message = "^build", group = "<!-- 03 -->🏗️ Build" },
+  { message = "^doc", group = "<!-- 04 -->📚 Documentation" },
+  { message = "^perf", group = "<!-- 05 -->⚡ Performance" },
+  { message = "^style", group = "<!-- 06 -->🎨 Styling" },
+  { message = "^test", group = "<!-- 07 -->🧪 Testing" },
+  { body = ".*security", group = "<!-- 08 -->🛡️ Security" },
+  { message = "^revert", group = "<!-- 09 -->◀️ Revert" },
+  { message = "^ci", skip = true },
+  # Catches `chore:` commits (including release-plz's own synthetic ones for workspace
+  # dependency bumps and packages pulled forward by a local path dependency release) and
+  # anything else non-conventional.
   { message = ".*", group = "<!-- 10 -->🌀 Other" },
 ]
 

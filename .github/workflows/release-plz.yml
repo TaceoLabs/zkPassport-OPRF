@@ -5,59 +5,88 @@ on:
     branches:
       - main
 
+permissions: {}
+
+env:
+  # Release of the TaceoLabs release-plz fork to use:
+  # https://github.com/TaceoLabs/release-plz/releases
+  RELEASE_PLZ_TAG: release-plz-v0.3.162-taceo.1
+
 jobs:
   release-plz-release:
     name: Release-plz release
     runs-on: ubuntu-latest
     if: ${{ github.repository_owner == 'TaceoLabs' }}
     permissions:
-      contents: write
-      id-token: write
+      contents: read
     steps:
-      - &generate-token
-        name: Generate GitHub App token
-        id: generate-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
-          private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
       - &checkout
         name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          persist-credentials: true
-          token: ${{ steps.generate-token.outputs.token }}
+          persist-credentials: false
           submodules: recursive
       - &install-rust
         name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           toolchain: stable
-      - name: Run release-plz
-        uses: release-plz/action@2eb1d8bcb770b4c48ccfaad919734b38b51958c9 # v0.5.131
+      - &install-release-plz
+        name: Install release-plz
+        run: |
+          set -euo pipefail
+          url="https://github.com/TaceoLabs/release-plz/releases/download/${RELEASE_PLZ_TAG}/release-plz-x86_64-unknown-linux-gnu.tar.gz"
+          mkdir -p "${RUNNER_TEMP}/release-plz"
+          curl -fsSL "${url}" | tar -xz -C "${RUNNER_TEMP}/release-plz"
+          echo "${RUNNER_TEMP}/release-plz" >> "${GITHUB_PATH}"
+          "${RUNNER_TEMP}/release-plz/release-plz" --version
+      # PRs and tags created with an app token trigger other workflows,
+      # which the default GITHUB_TOKEN does not.
+      - name: Generate GitHub App token
+        id: generate-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          command: release
+          app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Configure git user from GitHub token
+        uses: release-plz/git-config@59144859caf016f8b817a2ac9b051578729173c4
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+      - name: Run release-plz release
+        env:
+          GIT_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: release-plz release
 
   release-plz-pr:
     name: Release-plz PR
     runs-on: ubuntu-latest
     if: ${{ github.repository_owner == 'TaceoLabs' }}
     permissions:
-      pull-requests: write
-      contents: write
+      contents: read
     concurrency:
       group: release-plz-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - *generate-token
       - *checkout
       - *install-rust
-      - name: Run release-plz
-        uses: release-plz/action@2eb1d8bcb770b4c48ccfaad919734b38b51958c9 # v0.5.131
+      - *install-release-plz
+      - name: Generate GitHub App token
+        id: generate-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          command: release-pr
+          app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Configure git user from GitHub token
+        uses: release-plz/git-config@59144859caf016f8b817a2ac9b051578729173c4
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+      - name: Run release-plz release-pr
+        env:
+          GIT_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          release-plz release-pr \
+            --repo-url "https://github.com/${GITHUB_REPOSITORY}"

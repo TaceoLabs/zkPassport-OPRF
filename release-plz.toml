@@ -1,24 +1,21 @@
 [workspace]
-# Internal library crates are not independently versioned or released.
-# Only the node binary crate is released (see [[package]] below).
-release = false
+git_only = true
+release_always = false
+# Only the node produces a deployable artifact, so it is the only crate with a GitHub release.
+git_release_enable = false
+git_tag_name = "{{ package }}-v{{ version }}"
+git_release_name = "{{ package }}-v{{ version }}"
 
 [[package]]
 name = "taceo-zkpassport-oprf-node"
-release = true
-publish = false
-git_only = true
 git_release_enable = true
-# Drop the "taceo-" prefix so the tag matches what build-and-push-node.yml
-# listens for: "zkpassport-oprf-node-v*"
-git_tag_name = "zkpassport-oprf-node-v{{ version }}"
-changelog_path = "node/CHANGELOG.md"
+
+[[package]]
+name = "taceo-zkpassport-dev-client"
+semver_check = false  # bin-only crate, cargo-semver-checks is lib-only
 
 [changelog]
-header = """# Changelog
-
-## [Unreleased]
-"""
+header = "# Changelog"
 
 body = """
 
@@ -39,7 +36,6 @@ body = """
 
 {% for group, commits in commits
 | filter(attribute="merge_commit", value=false)
-| unique(attribute="message")
 | group_by(attribute="group") %}
     ### {{ group | striptags | trim | upper_first }}
 
@@ -62,6 +58,7 @@ commit_parsers = [
   { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
   { message = "^refactor", group = "<!-- 2 -->🚜 Refactor" },
   { message = "^build", group = "<!-- 3 -->🏗️ Build" },
+  { message = "^chore: update Cargo\\.(toml|lock) dependencies", group = "<!-- 3 -->🏗️ Build" },
   { message = "^doc", group = "<!-- 4 -->📚 Documentation" },
   { message = "^perf", group = "<!-- 5 -->⚡ Performance" },
   { message = "^style", group = "<!-- 6 -->🎨 Styling" },
@@ -69,6 +66,7 @@ commit_parsers = [
   { body = ".*security", group = "<!-- 8 -->🛡️ Security" },
   { message = "^revert", group = "<!-- 9 -->◀️ Revert" },
   { message = "^chore|^ci", skip = true },
+  { message = ".*", group = "<!-- 10 -->🌀 Other" },
 ]
 
 link_parsers = [

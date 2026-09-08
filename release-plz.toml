@@ -1,5 +1,6 @@
 [workspace]
 git_only = true
+publish = false
 release_always = false
 # Only the node produces a deployable artifact, so it is the only crate with a GitHub release.
 git_release_enable = false

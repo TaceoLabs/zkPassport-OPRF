@@ -231,7 +231,7 @@ fn serialize_point_to_hex<S: Serializer>(
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{sync::Arc, time::Duration};
 
     use ruint::aliases::U160;
     use taceo_oprf::{
@@ -244,7 +244,10 @@ mod tests {
     };
     use uuid::Uuid;
     use zkpassport_oprf_authentication::{FaceMatchRequestAuth, error_codes};
-    use zkpassport_oprf_test_utils::fixtures::FixtureData;
+    use zkpassport_oprf_test_utils::{
+        containers::{SharedProofVerifier, shared_proof_verifier},
+        fixtures::FixtureData,
+    };
 
     use crate::{config::RetryLayerConfig, services::face_match::FaceMatchAuthenticator};
 
@@ -254,14 +257,14 @@ mod tests {
             .build()?)
     }
 
-    async fn auth_service() -> eyre::Result<FaceMatchAuthenticator> {
-        let proof_verifier_url =
-            zkpassport_oprf_test_utils::containers::get_proof_verifier_url().await;
-        Ok(FaceMatchAuthenticator::init(
+    async fn auth_service() -> eyre::Result<(FaceMatchAuthenticator, Arc<SharedProofVerifier>)> {
+        let proof_verifier = shared_proof_verifier().await;
+        let service = FaceMatchAuthenticator::init(
             test_client()?,
-            proof_verifier_url.join("verify-oprf-auth?devmode=true")?,
+            proof_verifier.url.join("verify-oprf-auth?devmode=true")?,
             RetryLayerConfig::disabled(),
-        ))
+        );
+        Ok((service, proof_verifier))
     }
 
     fn build_request(fixture: FixtureData) -> OprfRequest<FaceMatchRequestAuth> {
@@ -280,7 +283,8 @@ mod tests {
     async fn success_test() -> eyre::Result<()> {
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);
-        let oprf_key = auth_service().await?.authenticate(&request).await?;
+        let (auth_service, _proof_verifier) = auth_service().await?;
+        let oprf_key = auth_service.authenticate(&request).await?;
         assert_eq!(oprf_key.into_inner(), 1);
         Ok(())
     }
@@ -291,8 +295,8 @@ mod tests {
         fixture.proofs[0].proof = Some("invalid value".to_string());
         let request = build_request(fixture);
 
-        let is_err = auth_service()
-            .await?
+        let (auth_service, _proof_verifier) = auth_service().await?;
+        let is_err = auth_service
             .authenticate(&request)
             .await
             .expect_err("Should fail");
@@ -310,8 +314,8 @@ mod tests {
         fixture.proofs[1].proof = dummy;
         let request = build_request(fixture);
 
-        let is_err = auth_service()
-            .await?
+        let (auth_service, _proof_verifier) = auth_service().await?;
+        let is_err = auth_service
             .authenticate(&request)
             .await
             .expect_err("Should fail");
@@ -330,8 +334,8 @@ mod tests {
         fixture.proofs.pop();
         let request = build_request(fixture);
 
-        let is_err = auth_service()
-            .await?
+        let (auth_service, _proof_verifier) = auth_service().await?;
+        let is_err = auth_service
             .authenticate(&request)
             .await
             .expect_err("Should fail");
@@ -350,8 +354,8 @@ mod tests {
         fixture.proofs[3].proof = None;
         let request = build_request(fixture);
 
-        let is_err = auth_service()
-            .await?
+        let (auth_service, _proof_verifier) = auth_service().await?;
+        let is_err = auth_service
             .authenticate(&request)
             .await
             .expect_err("Should fail");
@@ -367,8 +371,8 @@ mod tests {
         fixture.proofs[4].proof = None;
         let request = build_request(fixture);
 
-        let is_err = auth_service()
-            .await?
+        let (auth_service, _proof_verifier) = auth_service().await?;
+        let is_err = auth_service
             .authenticate(&request)
             .await
             .expect_err("Should fail");
@@ -395,8 +399,8 @@ mod tests {
             auth: FaceMatchRequestAuth::new(OprfKeyId::new(U160::from(1)), fixture.proofs),
         };
 
-        let is_err = auth_service()
-            .await?
+        let (auth_service, _proof_verifier) = auth_service().await?;
+        let is_err = auth_service
             .authenticate(&request)
             .await
             .expect_err("Should fail");
@@ -437,8 +441,8 @@ mod tests {
         let mut request = build_request(fixture);
         request.auth.proofs.clear();
 
-        let is_err = auth_service()
-            .await?
+        let (auth_service, _proof_verifier) = auth_service().await?;
+        let is_err = auth_service
             .authenticate(&request)
             .await
             .expect_err("Should fail");

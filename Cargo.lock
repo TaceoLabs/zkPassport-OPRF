@@ -6829,7 +6829,7 @@ dependencies = [
 
 [[package]]
 name = "taceo-zkpassport-dev-client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "alloy",
  "clap",
@@ -6848,7 +6848,7 @@ dependencies = [
 
 [[package]]
 name = "taceo-zkpassport-oprf-authentication"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -6858,7 +6858,7 @@ dependencies = [
 
 [[package]]
 name = "taceo-zkpassport-oprf-client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ark-ff 0.6.0",
  "eyre",

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/TaceoLabs/zkPassport-OPRF/compare/taceo-zkpassport-dev-client-v0.1.0...taceo-zkpassport-dev-client-v0.1.1)
+
+### 🏗️ Build
+
+
+- Update Cargo.toml dependencies - ([0000000](https://github.com/TaceoLabs/zkPassport-OPRF/commit/0000000))
+
+
 ## [0.1.0]
 
 ### ⛰️ Features

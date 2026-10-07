@@ -4,13 +4,24 @@ use sqlx::PgPool;
 use taceo_nodes_common::postgres::{CreateSchema, PostgresConfig};
 use tracing::instrument;
 
+/// The postgres DB connection that stores the user registration material.
+///
+/// Is another pool than the OPRF defined secret-manager, but can use the same DB connection with a different schema. This is necessary because the schema for this DB is managed by the nodes and they need write access to this schema in contrast to the DB schema that manages the OPRF keys.
 #[derive(Clone, Debug)]
 pub struct ZkPassportDb {
+    #[allow(dead_code, reason = "reserved for v2")]
     pool: PgPool,
+    #[allow(dead_code, reason = "reserved for v2")]
     backoff: backon::ConstantBuilder,
 }
 
 impl ZkPassportDb {
+    /// Initializes the `ZkPassportDb`.
+    ///
+    /// Connects to the Postgres database using the provided configuration potentially running migrations.
+    ///
+    /// # Errors
+    /// Returns an error if the connection to the database fails.
     #[instrument(level = "debug", skip_all)]
     pub async fn init(config: &PostgresConfig) -> eyre::Result<Self> {
         tracing::debug!("init PgPool with schema: {}", config.schema);
@@ -32,6 +43,7 @@ impl ZkPassportDb {
         })
     }
 
+    #[allow(dead_code, reason = "reserved for v2")]
     pub(crate) async fn with_retry<F, Fut, T>(&self, op_name: &str, f: F) -> sqlx::Result<T>
     where
         F: Fn() -> Fut,
@@ -47,6 +59,7 @@ impl ZkPassportDb {
     }
 }
 
+#[allow(dead_code, reason = "reserved for v2")]
 fn is_retryable_error(e: &sqlx::Error) -> bool {
     match e {
         // structural / driver-level errors

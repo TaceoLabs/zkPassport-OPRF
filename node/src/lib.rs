@@ -22,7 +22,7 @@ use zkpassport_oprf_authentication::AuthModules;
 
 use crate::{
     config::ZkPassportNodeConfig,
-    services::{face_match::FaceMatchAuthenticator, health_check},
+    services::{health_check, oracle_proxy::OracleProxy, v1::face_match::FaceMatchAuthenticator},
 };
 
 pub mod config;
@@ -36,19 +36,21 @@ pub use services::postgres::ZkPassportDb;
 /// # Parameters
 /// - `config` — node configuration (oracle URLs, OPRF service config)
 /// - `secret_manager` — back-end for loading and storing OPRF key shares
-/// - `cancellation_token` — signals all background tasks to shut down
+/// - `zkpassport_db` — initialized users database, with migrations applied at startup
+/// - `node_information` — identity and peer information for the OPRF service
+/// - `version_str` — version reported by the OPRF service
 ///
 /// # Returns
 /// The Axum [`Router`](axum::Router) to be served by the HTTP listener.
 ///
 /// # Errors
-/// Returns an error if the `FaceMatchAuthenticator` fails to initialize or the OPRF service
-/// cannot be set up. The oracle health-check task is spawned detached and only logs its results
-/// — it does not affect the return value of this function.
+/// Returns an error if the oracle client cannot be initialized. The oracle
+/// health-check task is spawned detached and only logs its results; it does not
+/// affect the return value of this function.
 pub fn start(
     config: ZkPassportNodeConfig,
     secret_manager: SecretManagerService,
-    zkpassport_db: ZkPassportNodeConfig,
+    _zkpassport_db: ZkPassportDb,
     node_information: &NodeInformation,
     version_str: String,
 ) -> eyre::Result<axum::Router> {
@@ -69,11 +71,12 @@ pub fn start(
     ));
 
     tracing::info!("init oprf request auth service..");
-    let oprf_req_auth_service = Arc::new(FaceMatchAuthenticator::init(
+    let oracle_proxy = OracleProxy::init(
         oracle_client,
         config.oracle_verifier_url,
         config.oracle_retry_layer,
-    ));
+    );
+    let oprf_req_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy));
 
     tracing::info!("init oprf service..");
     let router = taceo_oprf::service::OprfServiceBuilder::init(

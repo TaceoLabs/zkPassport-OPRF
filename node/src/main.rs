@@ -153,6 +153,7 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
     let oprf_service_router = taceo_zkpassport_oprf_node::start(
         config.node_config,
         secret_manager,
+        zkpassport_db,
         &node_information,
         taceo_nodes_common::version_info!(),
     )?

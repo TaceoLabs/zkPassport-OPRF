@@ -2,7 +2,7 @@
 # already *-unknown-linux-musl and binaries are fully static by default. This
 # sidesteps Debian musl-tools' musl-gcc wrapper, which mishandles jemalloc's
 # C11 atomics probe.
-FROM rust:1.91-alpine3.21 AS chef
+FROM rust:1.94.1-alpine3.21 AS chef
 WORKDIR /app
 RUN apk add --no-cache musl-dev cmake clang clang-dev pkgconfig perl make \
     && cargo install cargo-chef --version 0.1.73 --locked

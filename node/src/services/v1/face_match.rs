@@ -1,66 +1,29 @@
-use std::fmt::Write as _;
-
-use ark_serialize::CanonicalSerialize;
-use backon::{ExponentialBuilder, Retryable as _};
-use reqwest::{StatusCode, Url};
-use serde::ser::Error;
-
-use serde::{Deserialize, Serialize, Serializer};
 use taceo_oprf::types::{
     OprfKeyId,
     api::{OprfRequest, OprfRequestAuthenticator, OprfRequestAuthenticatorError},
-    ark_babyjubjub,
     async_trait::async_trait,
 };
 use tracing::instrument;
-use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth, ZKPassportProofResult};
+use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth};
 
-use crate::config::RetryLayerConfig;
-
-/// Request body sent to the oracle's proof-verification endpoint (`POST /oprf/verify`).
-#[derive(Debug, Clone, Serialize)]
-struct OracleVerifyRequest {
-    #[serde(serialize_with = "serialize_point_to_hex")]
-    /// The blinded unique identifier (`BabyJubJub` affine point), hex-encoded as `"0x<x><y>"`.
-    blinded_unique_identifier: ark_babyjubjub::EdwardsAffine,
-    /// The zkPassport proofs submitted by the client.
-    proofs: Vec<ZKPassportProofResult>,
-}
-
-/// Response body received from the oracle's verification endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct OracleVerifyResponse {
-    /// Whether the oracle accepted the proofs.
-    verified: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// Optional error message returned when `verified` is `false`.
-    error: Option<String>,
-}
+use crate::services::oracle_proxy::{OracleError, OracleFaceMatchRequest, OracleProxy};
 
 /// Errors that can occur while authenticating an OPRF request via the face-match oracle.
 #[derive(Debug, thiserror::Error)]
-pub enum FaceMatchAuthError {
-    /// Cannot reach oracle
+pub(crate) enum FaceMatchAuthError {
     #[error(transparent)]
-    OracleNotReachable(#[from] reqwest::Error),
-    /// Oracle returned with BAD REQUEST
-    #[error("Bad Request: {0}")]
-    BadRequest(String),
-    /// Oracle returned a non-success HTTP status
-    #[error("Unexpected status code: {status} with body: {body}")]
-    UnexpectedStatusCode { status: StatusCode, body: String },
-    /// Serde
-    #[error(transparent)]
-    InvalidMessage(#[from] serde_json::Error),
+    Oracle(#[from] OracleError),
 }
 
 impl From<FaceMatchAuthError> for AuthErrorKind {
     fn from(value: FaceMatchAuthError) -> Self {
-        match value {
-            FaceMatchAuthError::OracleNotReachable(_) => Self::OracleNotReachable,
-            FaceMatchAuthError::BadRequest(reason) => Self::OracleBadRequest(reason),
-            FaceMatchAuthError::UnexpectedStatusCode { .. }
-            | FaceMatchAuthError::InvalidMessage(_) => Self::Internal,
+        let FaceMatchAuthError::Oracle(oracle_error) = value;
+        match oracle_error {
+            OracleError::OracleNotReachable(_) => Self::OracleNotReachable,
+            OracleError::BadRequest(reason) => Self::OracleBadRequest(reason),
+            OracleError::UnexpectedStatusCode { .. } | OracleError::InvalidMessage(_) => {
+                Self::Internal
+            }
         }
     }
 }
@@ -69,7 +32,8 @@ impl FaceMatchAuthError {
     /// Log the error at the appropriate tracing level.
     #[inline]
     pub(crate) fn log(&self) {
-        if matches!(self, FaceMatchAuthError::BadRequest(_)) {
+        let FaceMatchAuthError::Oracle(oracle_error) = self;
+        if matches!(oracle_error, OracleError::BadRequest(_)) {
             tracing::warn!(err=?self, auth_error=true, "{self}");
         } else {
             tracing::error!(err=?self, "{self}");
@@ -80,88 +44,28 @@ impl FaceMatchAuthError {
 /// Authenticator that verifies zkPassport face-match proofs by forwarding them to an oracle.
 ///
 /// Implements [`OprfRequestAuthenticator`] and is registered on the OPRF service builder
-/// for the `face` authentication module.
+/// for the `/face-match` authentication module.
 pub struct FaceMatchAuthenticator {
-    client: reqwest::Client,
-    verify_url: Url,
-    backon: ExponentialBuilder,
+    proxy: OracleProxy,
 }
 
 impl FaceMatchAuthenticator {
     /// Initialize the authenticator.
     ///
-    /// Stores the HTTP client and the `verify_url` used for subsequent
-    /// proof-verification requests. Oracle reachability is not checked here; a
-    /// separate background task polls the oracle's health endpoint (see
+    /// Stores the oracle proxy used for subsequent proof-verification requests.
+    /// Oracle reachability is not checked here; a separate background task
+    /// polls the oracle's health endpoint (see
     /// [`crate::services::health_check`]).
-    pub fn init(client: reqwest::Client, verify_url: Url, retry_layer: RetryLayerConfig) -> Self {
-        Self {
-            client,
-            verify_url,
-            backon: retry_layer.exponential_backoff(),
-        }
+    pub fn init(proxy: OracleProxy) -> Self {
+        Self { proxy }
     }
 
-    /// Send the OPRF request's blinded query and proofs to the oracle and return the key ID.
+    /// Send the OPRF request's blinded query and proofs to the oracle.
     async fn authenticate_inner(
         &self,
-        request: &OracleVerifyRequest,
+        request: &OracleFaceMatchRequest,
     ) -> Result<(), FaceMatchAuthError> {
-        tracing::trace!("sending verify request to oracle: {}", self.verify_url);
-        let response = self
-            .client
-            .post(self.verify_url.clone())
-            .json(&request)
-            .send()
-            .await?;
-
-        let status = response.status();
-
-        if status == StatusCode::OK {
-            tracing::trace!("oracle verified proofs successfully");
-            Ok(())
-        } else if status == StatusCode::BAD_REQUEST {
-            tracing::trace!("received BAD REQUEST from oracle");
-            let body = response.text().await?;
-            let error_msg = match serde_json::from_str::<OracleVerifyResponse>(&body) {
-                Ok(response) => response.error.unwrap_or_else(|| "unknown".to_owned()),
-                Err(err) => {
-                    tracing::error!(%err,"could not parse oracle verify response: {err}");
-                    "unknown".to_owned()
-                }
-            };
-
-            Err(FaceMatchAuthError::BadRequest(error_msg))
-        } else {
-            tracing::trace!("unknown status code: {status}");
-            let body = response.text().await?;
-            Err(FaceMatchAuthError::UnexpectedStatusCode { status, body })
-        }
-    }
-}
-
-fn is_retryable_error(e: &FaceMatchAuthError) -> bool {
-    // Transport-level failures: no usable response came back.
-    //
-    // HTTP status failures worth retrying:
-    // * 408 REQUEST TIMEOUT
-    // * 429 TOO MANY REQUESTS
-    // * 502 BAD GATEWAY
-    // * 503 SERVICE UNAVAILABLE
-    // * 504 GATEWAY TIMEOUT
-    //
-    // we do not retry INTERNAL SERVER ERROR
-    match e {
-        FaceMatchAuthError::OracleNotReachable(error) => error.is_connect(),
-        FaceMatchAuthError::UnexpectedStatusCode { status, .. } => matches!(
-            *status,
-            StatusCode::REQUEST_TIMEOUT
-                | StatusCode::TOO_MANY_REQUESTS
-                | StatusCode::BAD_GATEWAY
-                | StatusCode::SERVICE_UNAVAILABLE
-                | StatusCode::GATEWAY_TIMEOUT
-        ),
-        FaceMatchAuthError::BadRequest(_) | FaceMatchAuthError::InvalidMessage(_) => false,
+        Ok(self.proxy.face_match(request).await?)
     }
 }
 
@@ -174,59 +78,14 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
-        let auth_body = OracleVerifyRequest {
-            blinded_unique_identifier: request.blinded_query,
-            proofs: request.auth.proofs.clone(),
-        };
-        (|| async { self.authenticate_inner(&auth_body).await })
-            .retry(self.backon)
-            .when(is_retryable_error)
-            .notify(|err, duration| {
-                tracing::warn!(?err, retry_in = ?duration, "retrying request to verifier oracle");
-            })
+        let auth_body =
+            OracleFaceMatchRequest::new(request.blinded_query, request.auth.proofs.clone());
+        self.authenticate_inner(&auth_body)
             .await
             .inspect_err(FaceMatchAuthError::log)
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))?;
         Ok(request.auth.oprf_key_id)
     }
-}
-
-/// Serialize a `BabyJubJub` affine point to a `"0x<x><y>"` hex string.
-///
-/// Coordinates are serialized in big-endian byte order to match the circuit's
-/// public output format. `ark-serialize` returns little-endian bytes, so both
-/// coordinate byte vectors are reversed before encoding.
-fn serialize_point_to_hex<S: Serializer>(
-    point: &ark_babyjubjub::EdwardsAffine,
-    ser: S,
-) -> Result<S::Ok, S::Error> {
-    // Serialize x and y coordinates in big-endian to match the circuit's public output format
-    // `blinded_query` in circuit returns (x, y) as Field elements which are big-endian
-    let mut x_bytes = Vec::new();
-    point
-        .x
-        .serialize_compressed(&mut x_bytes)
-        .map_err(S::Error::custom)?;
-
-    x_bytes.reverse(); // ark serializes in little-endian, circuit outputs are big-endian
-
-    let mut y_bytes = Vec::new();
-    point
-        .y
-        .serialize_compressed(&mut y_bytes)
-        .map_err(S::Error::custom)?;
-    y_bytes.reverse();
-
-    let mut hex_x = String::with_capacity(x_bytes.len() * 2);
-    for b in &x_bytes {
-        write!(&mut hex_x, "{b:02x}").expect("Write to a string should never panic");
-    }
-
-    let mut hex_y = String::with_capacity(y_bytes.len() * 2);
-    for b in &y_bytes {
-        write!(&mut hex_y, "{b:02x}").expect("Write to a string should never panic");
-    }
-    ser.serialize_str(&format!("0x{hex_x}{hex_y}"))
 }
 
 #[cfg(test)]
@@ -249,7 +108,10 @@ mod tests {
         fixtures::FixtureData,
     };
 
-    use crate::{config::RetryLayerConfig, services::face_match::FaceMatchAuthenticator};
+    use crate::{
+        config::RetryLayerConfig,
+        services::{oracle_proxy::OracleProxy, v1::face_match::FaceMatchAuthenticator},
+    };
 
     fn test_client() -> eyre::Result<reqwest::Client> {
         Ok(reqwest::ClientBuilder::new()
@@ -259,11 +121,12 @@ mod tests {
 
     async fn auth_service() -> eyre::Result<(FaceMatchAuthenticator, Arc<SharedProofVerifier>)> {
         let proof_verifier = shared_proof_verifier().await;
-        let service = FaceMatchAuthenticator::init(
+        let proxy = OracleProxy::init(
             test_client()?,
             proof_verifier.url.join("verify-oprf-auth?devmode=true")?,
             RetryLayerConfig::disabled(),
         );
+        let service = FaceMatchAuthenticator::init(proxy);
         Ok((service, proof_verifier))
     }
 
@@ -417,11 +280,12 @@ mod tests {
     async fn oracle_unreachable_test() -> eyre::Result<()> {
         // Port 1 on loopback is never open; any connection attempt immediately
         // returns ECONNREFUSED without waiting for a timeout.
-        let auth_service = FaceMatchAuthenticator::init(
+        let proxy = OracleProxy::init(
             test_client()?,
             "http://127.0.0.1:1/verify-oprf-auth".parse()?,
             RetryLayerConfig::disabled(),
         );
+        let auth_service = FaceMatchAuthenticator::init(proxy);
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);
 

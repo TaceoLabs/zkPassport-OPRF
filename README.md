@@ -101,12 +101,14 @@ Each poll logs one of three outcomes via `tracing`:
 
 ## Secret Management
 
-OPRF key shares are stored in a PostgreSQL database, managed by the upstream `taceo-oprf` secret manager.
+OPRF key shares are stored in a PostgreSQL schema managed by the upstream `taceo-oprf` secret manager. A separate schema stores passport registrations and is initialized and migrated when the node starts. Both schemas can use the same PostgreSQL database.
 
 **Required environment variables:**
 
-* `TACEO_OPRF_NODE__POSTGRES__CONNECTION_STRING` — PostgreSQL connection string
-* `TACEO_OPRF_NODE__POSTGRES__SCHEMA` — Database schema to use
+* `TACEO_OPRF_NODE__OPRF_KEYS_POSTGRES__CONNECTION_STRING` — PostgreSQL connection string for OPRF keys
+* `TACEO_OPRF_NODE__OPRF_KEYS_POSTGRES__SCHEMA` — schema for OPRF keys
+* `TACEO_OPRF_NODE__USERS_POSTGRES__CONNECTION_STRING` — PostgreSQL connection string for passport registrations
+* `TACEO_OPRF_NODE__USERS_POSTGRES__SCHEMA` — schema for passport registrations
 
 **Security considerations:**
 

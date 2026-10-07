@@ -15,7 +15,7 @@ use taceo_oprf::{
     service::secret_manager::{SecretManager, postgres::PostgresSecretManager},
     types::service::NodeInformation,
 };
-use taceo_zkpassport_oprf_node::config::ZkPassportNodeConfig;
+use taceo_zkpassport_oprf_node::{ZkPassportDb, config::ZkPassportNodeConfig};
 
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
@@ -44,8 +44,11 @@ struct FullZkPassportNodeConfig {
     #[serde(rename = "service")]
     pub node_config: ZkPassportNodeConfig,
     /// The postgres config for the secret-manager
-    #[serde(rename = "postgres")]
-    pub postgres_config: PostgresConfig,
+    #[serde(rename = "oprf_keys_postgres")]
+    pub postgres_secret_manager_config: PostgresConfig,
+    /// The postgres config for the registered users
+    #[serde(rename = "users_postgres")]
+    pub zkpassport_postgres_config: PostgresConfig,
 }
 
 /// Load and deserialize the node configuration from environment variables.
@@ -117,10 +120,15 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
     // Load the postgres secret manager.
     tracing::info!("connect to postgres secret-manager..");
     let secret_manager = Arc::new(
-        PostgresSecretManager::init(&config.postgres_config)
+        PostgresSecretManager::init(&config.postgres_secret_manager_config)
             .await
             .context("while starting postgres secret-manager")?,
     );
+
+    tracing::info!("connect to postgres zk-passport DB..");
+    let zkpassport_db = ZkPassportDb::init(&config.zkpassport_postgres_config)
+        .await
+        .context("while starting zk-passport DB")?;
 
     let (cancellation_token, _) =
         taceo_nodes_common::spawn_shutdown_task(taceo_nodes_common::default_shutdown_signal());

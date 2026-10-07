@@ -29,6 +29,8 @@ pub mod config;
 pub mod metrics;
 pub(crate) mod services;
 
+pub use services::postgres::ZkPassportDb;
+
 /// Initialize and wire the zkPassport OPRF service.
 ///
 /// # Parameters
@@ -46,6 +48,7 @@ pub(crate) mod services;
 pub fn start(
     config: ZkPassportNodeConfig,
     secret_manager: SecretManagerService,
+    zkpassport_db: ZkPassportNodeConfig,
     node_information: &NodeInformation,
     version_str: String,
 ) -> eyre::Result<axum::Router> {

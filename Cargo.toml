@@ -10,7 +10,7 @@ members = [
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.91"
+rust-version = "1.94.1"
 readme = "./README.md"
 homepage = "https://www.taceo.io"
 repository = "https://github.com/TaceoLabs/zkpassport-OPRF"
@@ -36,7 +36,8 @@ ruint = "1.18.0"
 rustls = "0.23"
 serde = { version = "1" }
 serde_json = { version = "1" }
-taceo-nodes-common = { version = "0.10.0", default-features = false }
+sqlx = { version = "0.8" }
+taceo-nodes-common = { version = "=0.10.1", default-features = false }
 taceo-oprf = { version = "0.18.3", default-features = false }
 telemetry-batteries = { version = "0.4.1", default-features = false }
 testcontainers = { version = "0.28", features = ["host-port-exposure", "http_wait_plain"] }

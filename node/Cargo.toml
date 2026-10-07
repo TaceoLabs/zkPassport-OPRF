@@ -23,6 +23,12 @@ reqwest = { workspace = true, features = ["default-tls", "json"] }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+sqlx = { workspace = true, features = [
+  "migrate",
+  "postgres",
+  "runtime-tokio",
+  "tls-rustls-aws-lc-rs",
+] }
 taceo-nodes-common = { workspace = true, features = ["postgres"] }
 taceo-oprf = { workspace = true, features = ["postgres", "service"] }
 telemetry-batteries = { workspace = true, features = ["metrics-statsd"] }

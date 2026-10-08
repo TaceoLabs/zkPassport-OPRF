@@ -4,10 +4,10 @@
 //!
 //! 1. Spawns a background oracle health-check task that periodically polls
 //!    the oracle's health endpoint and logs the result (see `services::health_check`).
-//! 2. Initializes the `FaceMatchAuthenticator`
-//!    that verifies zkPassport proofs through an oracle.
+//! 2. Initializes the `FaceMatchAuthenticator` and the `RegisterAuthenticator`
+//!    that verify zkPassport proofs through an oracle.
 //! 3. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
-//!    and registers the face-match authentication module.
+//!    and registers the face-match and register authentication modules.
 //! 4. Nests the HTTP API (`/api`, e.g. commitment rotation backed by the
 //!    passport registrations DB) next to the OPRF routes.
 //!
@@ -24,7 +24,7 @@ use taceo_oprf::{
 use zkpassport_oprf_authentication::AuthModules;
 
 use crate::{
-    auth_modules::face_match::FaceMatchAuthenticator,
+    auth_modules::{face_match::FaceMatchAuthenticator, register::RegisterAuthenticator},
     config::ZkPassportNodeConfig,
     services::{health_check, oracle_proxy::OracleProxy},
 };
@@ -84,7 +84,8 @@ pub fn start(
         config.oracle_retry_layer,
     )
     .context("while building oracle proxy")?;
-    let oprf_req_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy.clone()));
+    let face_match_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy.clone()));
+    let register_auth_service = Arc::new(RegisterAuthenticator::init(oracle_proxy.clone()));
 
     tracing::info!("init oprf service..");
     let oprf_router = taceo_oprf::service::OprfServiceBuilder::init(
@@ -97,7 +98,11 @@ pub fn start(
     .cors_for_info()
     .module(
         &format!("/{}", AuthModules::FaceMatch),
-        oprf_req_auth_service,
+        face_match_auth_service,
+    )
+    .module(
+        &format!("/{}", AuthModules::Register),
+        register_auth_service,
     )
     .build();
 

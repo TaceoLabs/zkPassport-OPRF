@@ -1,12 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
-  "authentication",
-  "client",
-  "dev-client",
-  "node",
-  "test-utils",
-]
+members = ["authentication", "client", "dev-client", "node", "test-utils"]
 
 [workspace.package]
 edition = "2024"
@@ -41,7 +35,10 @@ sqlx = { version = "0.9" }
 taceo-nodes-common = { version = "0.10.3", default-features = false }
 taceo-oprf = { version = "0.19", default-features = false }
 telemetry-batteries = { version = "0.4.1", default-features = false }
-testcontainers = { version = "0.28", features = ["host-port-exposure", "http_wait_plain"] }
+testcontainers = { version = "0.28", features = [
+  "host-port-exposure",
+  "http_wait_plain",
+] }
 thiserror = { version = "2" }
 tikv-jemallocator = "0.7"
 tokio = { version = "1" }

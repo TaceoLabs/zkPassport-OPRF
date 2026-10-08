@@ -153,7 +153,16 @@ impl OracleProxy {
     }
 
     #[instrument(level = "debug", skip_all)]
-    pub(crate) async fn face_match(&self, request: &OracleFaceMatchRequest) -> Result<()> {
+    pub(crate) async fn secret_rotation(&self) -> Result<()> {
+        tracing::trace!(
+            "sending verify request to oracle: {}",
+            self.endpoints.passport_proof
+        );
+        Ok(())
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    pub(crate) async fn v1_face_match(&self, request: &OracleFaceMatchRequest) -> Result<()> {
         tracing::trace!(
             "sending verify request to oracle: {}",
             self.endpoints.face_match

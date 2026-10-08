@@ -12,6 +12,8 @@ keywords = ["cryptography", "mpc", "oprf"]
 publish.workspace = true
 
 [dependencies]
+ark-serde-compat = { workspace = true, features = ["babyjubjub"] }
+ark-serialize.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 taceo-oprf = { workspace = true, features = ["types"] }

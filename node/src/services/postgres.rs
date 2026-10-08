@@ -3,15 +3,22 @@ use eyre::Context as _;
 use sqlx::PgPool;
 use taceo_nodes_common::postgres::{CreateSchema, PostgresConfig};
 use tracing::instrument;
+use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier};
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum DbError {
+    #[error("unknown identifier")]
+    UnknownIdentifier,
+    #[error("internal error: {0:?}")]
+    Internal(#[from] eyre::Report),
+}
 
 /// The postgres DB connection that stores the user registration material.
 ///
 /// Is another pool than the OPRF defined secret-manager, but can use the same DB connection with a different schema. This is necessary because the schema for this DB is managed by the nodes and they need write access to this schema in contrast to the DB schema that manages the OPRF keys.
 #[derive(Clone, Debug)]
 pub struct ZkPassportDb {
-    #[allow(dead_code, reason = "reserved for v2")]
     pool: PgPool,
-    #[allow(dead_code, reason = "reserved for v2")]
     backoff: backon::ConstantBuilder,
 }
 
@@ -43,7 +50,31 @@ impl ZkPassportDb {
         })
     }
 
-    #[allow(dead_code, reason = "reserved for v2")]
+    /// Replaces the commitment stored for `identifier`.
+    ///
+    /// # Errors
+    /// Returns [`DbError::UnknownIdentifier`] if no entry exists for `identifier`.
+    pub(crate) async fn rotate_commitment(
+        &self,
+        identifier: SaltedIdentifier,
+        commitment: AuthCommitment,
+    ) -> Result<(), DbError> {
+        let result = self
+            .with_retry("rotate_commitment", || {
+                sqlx::query(
+                    "UPDATE passport_registrations SET commitment = $2 WHERE identifier = $1",
+                )
+                .bind(taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier).as_slice())
+                .bind(taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment).as_slice())
+                .execute(&self.pool)
+            })
+            .await
+            .map_err(|e| DbError::Internal(eyre::Report::new(e)))?;
+        if result.rows_affected() == 0 {
+            return Err(DbError::UnknownIdentifier);
+        }
+        Ok(())
+    }
     pub(crate) async fn with_retry<F, Fut, T>(&self, op_name: &str, f: F) -> sqlx::Result<T>
     where
         F: Fn() -> Fut,
@@ -58,8 +89,6 @@ impl ZkPassportDb {
             .await
     }
 }
-
-#[allow(dead_code, reason = "reserved for v2")]
 fn is_retryable_error(e: &sqlx::Error) -> bool {
     match e {
         // structural / driver-level errors

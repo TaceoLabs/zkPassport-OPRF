@@ -8,11 +8,14 @@
 //!    that verifies zkPassport proofs through an oracle.
 //! 3. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
 //!    and registers the face-match authentication module.
+//! 4. Nests the HTTP API (`/api`, e.g. commitment rotation backed by the
+//!    passport registrations DB) next to the OPRF routes.
 //!
 //! The returned Axum router is consumed by the binary in `main.rs`.
 
 use std::sync::Arc;
 
+use axum::Router;
 use eyre::Context;
 use taceo_oprf::{
     service::{StartedServices, secret_manager::SecretManagerService},
@@ -21,10 +24,13 @@ use taceo_oprf::{
 use zkpassport_oprf_authentication::AuthModules;
 
 use crate::{
+    auth_modules::face_match::FaceMatchAuthenticator,
     config::ZkPassportNodeConfig,
-    services::{health_check, oracle_proxy::OracleProxy, v1::face_match::FaceMatchAuthenticator},
+    services::{health_check, oracle_proxy::OracleProxy},
 };
 
+pub(crate) mod api;
+pub(crate) mod auth_modules;
 pub mod config;
 pub mod metrics;
 pub(crate) mod services;
@@ -41,7 +47,7 @@ pub use services::postgres::ZkPassportDb;
 /// - `version_str` — version reported by the OPRF service
 ///
 /// # Returns
-/// The Axum [`Router`](axum::Router) to be served by the HTTP listener.
+/// The Axum [`Router`] to be served by the HTTP listener.
 ///
 /// # Errors
 /// Returns an error if the oracle client cannot be initialized. The oracle
@@ -50,7 +56,7 @@ pub use services::postgres::ZkPassportDb;
 pub fn start(
     config: ZkPassportNodeConfig,
     secret_manager: SecretManagerService,
-    _zkpassport_db: ZkPassportDb,
+    zkpassport_db: ZkPassportDb,
     node_information: &NodeInformation,
     version_str: String,
 ) -> eyre::Result<axum::Router> {
@@ -78,10 +84,10 @@ pub fn start(
         config.oracle_retry_layer,
     )
     .context("while building oracle proxy")?;
-    let oprf_req_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy));
+    let oprf_req_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy.clone()));
 
     tracing::info!("init oprf service..");
-    let router = taceo_oprf::service::OprfServiceBuilder::init(
+    let oprf_router = taceo_oprf::service::OprfServiceBuilder::init(
         node_config,
         secret_manager,
         started_services.clone(),
@@ -95,5 +101,7 @@ pub fn start(
     )
     .build();
 
-    Ok(router)
+    Ok(Router::new()
+        .nest("/api", api::routes(oracle_proxy, zkpassport_db))
+        .merge(oprf_router))
 }

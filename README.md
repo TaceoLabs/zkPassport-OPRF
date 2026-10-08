@@ -1,4 +1,4 @@
-[![CI](https://github.com/TaceoLabs/zkPassport-OPRF/actions/workflows/ci.yml/badge.svg)](https://github.com/TaceoLabs/zkPassport-OPRF/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](/LICENSE) [![Rust](https://img.shields.io/badge/rust-1.91%2B-orange.svg)](https://www.rust-lang.org)
+[![CI](https://github.com/TaceoLabs/zkPassport-OPRF/actions/workflows/ci.yml/badge.svg)](https://github.com/TaceoLabs/zkPassport-OPRF/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](/LICENSE) [![Rust](https://img.shields.io/badge/rust-1.94.1%2B-orange.svg)](https://www.rust-lang.org)
 
 # TACEO:OPRF for zkPassport
 
@@ -17,7 +17,7 @@ This is a monorepo containing:
 * [just](https://github.com/casey/just)
 * Docker Compose (for running `anvil` and `postgres` containers)
 * anvil and forge — install with [foundryup](https://getfoundry.sh/introduction/installation/)
-* Rust 1.91+ (edition 2024)
+* Rust 1.94.1+ (edition 2024)
 
 ## Setup
 
@@ -112,7 +112,7 @@ Each poll logs one of three outcomes via `tracing`:
 * **Connection error** — `ERROR cannot reach oracle health url`
 * **Non-200 response** — `ERROR oracle health check returned non-200 status` with status code and response body
 
-## Secret Management
+## Databases
 
 OPRF key shares are stored in a PostgreSQL schema managed by the upstream `taceo-oprf` secret manager. A separate schema stores passport registrations and is initialized and migrated (from `node/migrations`) when the node starts. Both schemas can use the same PostgreSQL database. The node needs write access to the registrations schema.
 
@@ -128,6 +128,10 @@ OPRF key shares are stored in a PostgreSQL schema managed by the upstream `taceo
 * The connection string contains credentials and should be treated as a secret
 * Use SSL/TLS connections in production (`?sslmode=require`)
 * Ensure the database is not publicly accessible
+
+## HTTP API
+
+* `POST /api/rotation`: replaces the commitment stored for a passport identifier `I`. Body: `{"I": <point>, "new_commitment": <field element>}`. Returns 404 for an unknown identifier. Oracle verification is still a stub.
 
 ## Architecture
 

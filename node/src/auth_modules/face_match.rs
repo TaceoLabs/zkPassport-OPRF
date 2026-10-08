@@ -40,7 +40,7 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
         let auth_body =
             OracleFaceMatchRequest::new(request.blinded_query, request.auth.proofs.clone());
         self.proxy
-            .face_match(&auth_body)
+            .v1_face_match(&auth_body)
             .await
             .inspect_err(|err| {
                 if matches!(err, OracleError::BadRequest(_)) {
@@ -76,8 +76,8 @@ mod tests {
     };
 
     use crate::{
-        config::RetryLayerConfig,
-        services::{oracle_proxy::OracleProxy, v1::face_match::FaceMatchAuthenticator},
+        auth_modules::face_match::FaceMatchAuthenticator, config::RetryLayerConfig,
+        services::oracle_proxy::OracleProxy,
     };
 
     fn test_client() -> eyre::Result<reqwest::Client> {

@@ -13,11 +13,64 @@
 //!   [`error_codes`] and conversions to the upstream
 //!   `OprfRequestAuthenticatorError`.
 
+use ark_serialize::CanonicalDeserialize;
+use ark_serialize::CanonicalSerialize;
 use serde::{Deserialize, Serialize};
 use taceo_oprf::types::{
     OprfKeyId,
     api::{CloseFrameMessage, OprfRequestAuthenticatorError},
+    ark_babyjubjub,
 };
+
+/// Unique, salted identifier `I` of a passport.
+///
+/// Users obtain an identifier by registering at the OPRF nodes. A user needs to provide a zero-knowledge proof for ownership of passport `P` and the nodes compute:
+///
+/// `OPRF(P, OPRF_reg) = I`
+///
+/// where `OPRF_reg` is a global OPRF key. Following the registration process, a user can store a commitment to a secret at the OPRF nodes associated with `I` for fast authentication.
+///
+/// If a user loses `I`, they can trivially re-compute it at the nodes.
+///
+/// State-level actors that might also be able to compute a zero-knowledge proof of ownership `P`, are also able to compute `I` which in itself doesn't leak anything, as `I` is only used for identifying a user in the OPRF eco-system. The state-level actor must also know the secret-key associated with `I` to perform any actions.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    CanonicalSerialize,
+    CanonicalDeserialize,
+)]
+pub struct SaltedIdentifier(
+    #[serde(with = "ark_serde_compat::babyjubjub::affine")] ark_babyjubjub::EdwardsAffine,
+);
+
+/// The commitment to the secret.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    CanonicalSerialize,
+    CanonicalDeserialize,
+)]
+pub struct AuthCommitment(#[serde(with = "ark_serde_compat::field")] ark_babyjubjub::Fq);
+
+/// Request when sending a rotation request.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CommitmentRotationRequest {
+    /// The identifier for which to rotate the secret
+    #[serde(rename = "I")]
+    pub salted_identifier: SaltedIdentifier,
+    /// The new commitment to persist in the database
+    pub new_commitment: AuthCommitment,
+}
 
 /// Identifies the authentication module used for an OPRF request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,12 +100,37 @@ pub struct FaceMatchRequestAuth {
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
+/// Authentication payload for a secret rotation request.
+///
+/// The embedded proofs are forwarded to the oracle for verification before
+/// the commitment is rotated.
+#[derive(Clone, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SecretRotationRequest {
+    /// The identifier for which to rotate the secret.
+    #[serde(rename = "I")]
+    pub salted_identifier: SaltedIdentifier,
+    /// zkPassport proofs that attest to the user's identity.
+    pub proofs: Vec<ZKPassportProofResult>,
+}
+
 impl FaceMatchRequestAuth {
     /// Creates a new `FaceMatchRequestAuth`.
     #[must_use]
     pub fn new(oprf_key_id: OprfKeyId, proofs: Vec<ZKPassportProofResult>) -> Self {
         Self {
             oprf_key_id,
+            proofs,
+        }
+    }
+}
+
+impl SecretRotationRequest {
+    /// Creates a new `SecretRotationRequest`.
+    #[must_use]
+    pub fn new(salted_identifier: SaltedIdentifier, proofs: Vec<ZKPassportProofResult>) -> Self {
+        Self {
+            salted_identifier,
             proofs,
         }
     }

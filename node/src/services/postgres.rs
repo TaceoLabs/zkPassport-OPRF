@@ -64,8 +64,14 @@ impl ZkPassportDb {
                 sqlx::query(
                     "UPDATE passport_registrations SET commitment = $2 WHERE identifier = $1",
                 )
-                .bind(taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier).as_slice())
-                .bind(taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment).as_slice())
+                .bind(
+                    taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier)
+                        .as_slice(),
+                )
+                .bind(
+                    taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment)
+                        .as_slice(),
+                )
                 .execute(&self.pool)
             })
             .await

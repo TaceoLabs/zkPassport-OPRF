@@ -82,6 +82,19 @@ OPRF key-gen instances are provided by the upstream [oprf-service](https://githu
 
 See `run-setup.sh` for a complete example of all required environment variables.
 
+### Oracle
+
+All oracle requests go through one proxy built from a base URL. Endpoint paths are appended to it:
+
+* `<base>/verify-oprf-auth`: face-match verification (v1)
+* `<base>/verify-passport-proof`: passport proof verification (v2, stub)
+
+In the `dev` environment, `?devmode=true` is added to every endpoint. Connection errors and HTTP 408, 429, 502, 503 and 504 are retried with exponential backoff.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TACEO_OPRF_NODE__SERVICE__ORACLE_BASE_URL` | yes | Base URL of the oracle (e.g. `http://127.0.0.1:8080`) |
+
 ### Oracle Health Check
 
 At startup the node spawns a background task that **polls the proof-verifier oracle**
@@ -101,7 +114,7 @@ Each poll logs one of three outcomes via `tracing`:
 
 ## Secret Management
 
-OPRF key shares are stored in a PostgreSQL schema managed by the upstream `taceo-oprf` secret manager. A separate schema stores passport registrations and is initialized and migrated when the node starts. Both schemas can use the same PostgreSQL database.
+OPRF key shares are stored in a PostgreSQL schema managed by the upstream `taceo-oprf` secret manager. A separate schema stores passport registrations and is initialized and migrated (from `node/migrations`) when the node starts. Both schemas can use the same PostgreSQL database. The node needs write access to the registrations schema.
 
 **Required environment variables:**
 

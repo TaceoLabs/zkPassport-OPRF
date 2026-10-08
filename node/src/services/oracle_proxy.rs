@@ -5,7 +5,8 @@ use backon::{ExponentialBuilder, Retryable as _};
 use reqwest::{StatusCode, Url};
 use serde::ser::Error;
 use serde::{Deserialize, Serialize, Serializer};
-use taceo_oprf::types::ark_babyjubjub;
+use taceo_oprf::{service::Environment, types::ark_babyjubjub};
+use tracing::instrument;
 use zkpassport_oprf_authentication::ZKPassportProofResult;
 
 use crate::config::RetryLayerConfig;
@@ -60,32 +61,95 @@ pub(crate) struct OracleFaceMatchResponse {
     error: Option<String>,
 }
 
+const FACE_MATCH_PATH: &str = "verify-oprf-auth";
+const PASSPORT_PROOF_PATH: &str = "verify-passport-proof";
+
+/// Full oracle endpoint URLs, derived once from the configured base URL.
+#[derive(Debug, Clone)]
+struct OracleEndpoints {
+    /// `<base>/verify-oprf-auth`, used by v1 face-match authentication.
+    face_match: Url,
+    /// `<base>/verify-passport-proof`, used by v2 registration and preimage proofs.
+    passport_proof: Url,
+}
+
+impl OracleEndpoints {
+    /// Appends each endpoint path to `base_url`.
+    ///
+    /// In [`Environment::Dev`] every endpoint gets `?devmode=true`; other environments
+    /// get no query. Any query on `base_url` is dropped.
+    fn new(mut base_url: Url, environment: Environment) -> eyre::Result<Self> {
+        // `Url::join` replaces the last path segment unless the base ends with '/'
+        if !base_url.path().ends_with('/') {
+            let path = format!("{}/", base_url.path());
+            base_url.set_path(&path);
+        }
+        let endpoint = |path: &str| -> eyre::Result<Url> {
+            let mut url = base_url.join(path)?;
+            if environment.is_dev() {
+                url.set_query(Some("devmode=true"));
+            }
+            Ok(url)
+        };
+        Ok(Self {
+            face_match: endpoint(FACE_MATCH_PATH)?,
+            passport_proof: endpoint(PASSPORT_PROOF_PATH)?,
+        })
+    }
+}
+
+/// HTTP client for all oracle endpoints, with shared retry policy.
 #[derive(Debug, Clone)]
 pub(crate) struct OracleProxy {
     client: reqwest::Client,
-    face_match_url: Url,
+    endpoints: OracleEndpoints,
     backoff: ExponentialBuilder,
 }
 
 impl OracleProxy {
     pub(crate) fn init(
         client: reqwest::Client,
-        face_match_url: Url,
+        base_url: Url,
+        environment: Environment,
         retry_layer: RetryLayerConfig,
-    ) -> Self {
-        Self {
+    ) -> eyre::Result<Self> {
+        Ok(Self {
             client,
-            face_match_url,
+            endpoints: OracleEndpoints::new(base_url, environment)?,
             backoff: retry_layer.exponential_backoff(),
-        }
+        })
     }
 
+    #[instrument(level = "debug", skip_all)]
+    #[expect(dead_code, reason = "is just a stub")]
+    pub(crate) async fn registration(&self) -> Result<()> {
+        tracing::trace!(
+            "sending verify request to oracle: {}",
+            self.endpoints.passport_proof
+        );
+        Ok(())
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    #[expect(dead_code, reason = "is just a stub")]
+    pub(crate) async fn preimage_proof(&self) -> Result<()> {
+        tracing::trace!(
+            "sending verify request to oracle: {}",
+            self.endpoints.passport_proof
+        );
+        Ok(())
+    }
+
+    #[instrument(level = "debug", skip_all)]
     pub(crate) async fn face_match(&self, request: &OracleFaceMatchRequest) -> Result<()> {
-        tracing::trace!("sending verify request to oracle: {}", self.face_match_url);
+        tracing::trace!(
+            "sending verify request to oracle: {}",
+            self.endpoints.face_match
+        );
         self.with_retry("face_match", || async {
             let response = self
                 .client
-                .post(self.face_match_url.clone())
+                .post(self.endpoints.face_match.clone())
                 .json(request)
                 .send()
                 .await?;
@@ -189,5 +253,29 @@ fn is_retryable_error(e: &OracleError) -> bool {
                 | StatusCode::GATEWAY_TIMEOUT
         ),
         OracleError::BadRequest(_) | OracleError::InvalidMessage(_) => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn endpoints_from_base_url() -> eyre::Result<()> {
+        for base in ["http://oracle:8080/api", "http://oracle:8080/api/"] {
+            let endpoints = OracleEndpoints::new(base.parse()?, Environment::Dev)?;
+            assert_eq!(
+                endpoints.face_match.as_str(),
+                "http://oracle:8080/api/verify-oprf-auth?devmode=true"
+            );
+        }
+        for environment in [Environment::Test, Environment::Prod] {
+            let endpoints = OracleEndpoints::new("http://oracle:8080".parse()?, environment)?;
+            assert_eq!(
+                endpoints.face_match.as_str(),
+                "http://oracle:8080/verify-oprf-auth"
+            );
+        }
+        Ok(())
     }
 }

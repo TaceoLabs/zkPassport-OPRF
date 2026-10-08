@@ -73,9 +73,11 @@ pub fn start(
     tracing::info!("init oprf request auth service..");
     let oracle_proxy = OracleProxy::init(
         oracle_client,
-        config.oracle_verifier_url,
+        config.oracle_base_url,
+        node_config.environment,
         config.oracle_retry_layer,
-    );
+    )
+    .context("while building oracle proxy")?;
     let oprf_req_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy));
 
     tracing::info!("init oprf service..");

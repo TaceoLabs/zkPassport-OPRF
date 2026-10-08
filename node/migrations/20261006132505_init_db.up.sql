@@ -1,6 +1,6 @@
 CREATE TABLE passport_registrations (
     -- I = OPRF(p_blind, k_reg), uncompressed Baby Jubjub point (x, y)
-    identifier      BYTEA       PRIMARY KEY CHECK (octet_length(identifier) = 64),
+    salted_identifier      BYTEA       PRIMARY KEY CHECK (octet_length(salted_identifier) = 64),
     -- current commitment, Baby Jubjub Fq (= BN254 Fr)
     commitment      BYTEA       NOT NULL    CHECK (octet_length(commitment) = 32),
     registered_at   TIMESTAMPTZ NOT NULL DEFAULT now(),

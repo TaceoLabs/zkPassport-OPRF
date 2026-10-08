@@ -4,7 +4,7 @@ use axum::{
     routing::post,
 };
 use tracing::instrument;
-use zkpassport_oprf_authentication::CommitmentRotationRequest;
+use zkpassport_oprf_authentication::{CommitmentRotationRequest, RegistrationRequest};
 
 use crate::{ZkPassportDb, api::errors::ApiError, services::oracle_proxy::OracleProxy};
 
@@ -48,8 +48,29 @@ async fn rotation(
     Ok(())
 }
 
+#[instrument(level = "info", skip_all)]
+async fn registration(
+    State(proxy): State<OracleProxy>,
+    State(db): State<ZkPassportDb>,
+    Json(RegistrationRequest {
+        salted_identifier,
+        commitment,
+        proofs: _,
+    }): Json<RegistrationRequest>,
+) -> ApiResult<()> {
+    // TODO: unauthenticated until the oracle check and proofs are implemented. Verify both
+    // the OPRF proof and the passport proof.
+    proxy.identifier_registration().await?;
+    tracing::trace!("proof verification for registration succeeded - storing identifier now");
+    db.insert_registration(salted_identifier, commitment)
+        .await?;
+    tracing::trace!("successfully registered identifier");
+    Ok(())
+}
+
 pub(crate) fn routes(proxy: OracleProxy, db: ZkPassportDb) -> Router {
     Router::new()
+        .route("/registration", post(registration))
         .route("/rotation", post(rotation))
         .with_state(AppState { proxy, db })
 }

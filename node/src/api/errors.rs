@@ -15,6 +15,8 @@ use crate::services::{oracle_proxy::OracleError, postgres::DbError};
 pub(crate) enum ApiError {
     #[error("unknown identifier")]
     UnknownIdentifier,
+    #[error("identifier already registered")]
+    AlreadyRegistered,
     #[error("bad request: {0}")]
     BadRequest(String),
     #[error("oracle not reachable")]
@@ -39,6 +41,7 @@ impl From<DbError> for ApiError {
     fn from(value: DbError) -> Self {
         match value {
             DbError::UnknownIdentifier => Self::UnknownIdentifier,
+            DbError::AlreadyRegistered => Self::AlreadyRegistered,
             DbError::Internal(report) => Self::Internal(report),
         }
     }
@@ -49,6 +52,7 @@ impl IntoResponse for ApiError {
         let (status, message) = match &self {
             Self::BadRequest(_) => (StatusCode::BAD_REQUEST, self.to_string()),
             Self::UnknownIdentifier => (StatusCode::NOT_FOUND, self.to_string()),
+            Self::AlreadyRegistered => (StatusCode::CONFLICT, self.to_string()),
             Self::OracleUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
             Self::Internal(report) => {
                 tracing::error!(err = ?report, "internal error");

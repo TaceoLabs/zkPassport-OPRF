@@ -9,6 +9,8 @@ use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier};
 pub(crate) enum DbError {
     #[error("unknown identifier")]
     UnknownIdentifier,
+    #[error("identifier already registered")]
+    AlreadyRegistered,
     #[error("internal error: {0:?}")]
     Internal(#[from] eyre::Report),
 }
@@ -48,6 +50,35 @@ impl ZkPassportDb {
                 .with_delay(config.retry_delay)
                 .with_max_times(config.max_retries.get()),
         })
+    }
+
+    /// Registers `identifier` with `commitment`. Never overwrites an existing entry.
+    ///
+    /// The insert is atomic, so of two concurrent registrations for the same `identifier`
+    /// only one is stored.
+    ///
+    /// Not retried: a retry after a lost reply would find the row it just inserted and
+    /// reject the client's own registration.
+    ///
+    /// # Errors
+    /// Returns [`DbError::AlreadyRegistered`] if `identifier` is already registered.
+    pub(crate) async fn insert_registration(
+        &self,
+        identifier: SaltedIdentifier,
+        commitment: AuthCommitment,
+    ) -> Result<(), DbError> {
+        let result = sqlx::query(
+            "INSERT INTO passport_registrations (salted_identifier, commitment) VALUES ($1, $2) ON CONFLICT (salted_identifier) DO NOTHING",
+        )
+        .bind(taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier).as_slice())
+        .bind(taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment).as_slice())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DbError::Internal(eyre::Report::new(e)))?;
+        if result.rows_affected() == 0 {
+            return Err(DbError::AlreadyRegistered);
+        }
+        Ok(())
     }
 
     /// Replaces the commitment stored for `identifier`.

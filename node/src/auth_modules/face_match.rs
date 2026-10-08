@@ -12,7 +12,7 @@ use crate::services::oracle_proxy::{OracleError, OracleFaceMatchRequest, OracleP
 ///
 /// Implements [`OprfRequestAuthenticator`] and is registered on the OPRF service builder
 /// for the `/face-match` authentication module.
-pub struct FaceMatchAuthenticator {
+pub(crate) struct FaceMatchAuthenticator {
     proxy: OracleProxy,
 }
 

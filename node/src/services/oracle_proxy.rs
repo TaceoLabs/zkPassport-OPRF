@@ -133,7 +133,6 @@ impl OracleProxy {
     }
 
     #[instrument(level = "debug", skip_all)]
-    #[expect(dead_code, reason = "is just a stub")]
     pub(crate) async fn registration(&self) -> Result<()> {
         tracing::trace!(
             "sending verify request to oracle: {}",

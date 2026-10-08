@@ -8,39 +8,6 @@ use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth};
 
 use crate::services::oracle_proxy::{OracleError, OracleFaceMatchRequest, OracleProxy};
 
-/// Errors that can occur while authenticating an OPRF request via the face-match oracle.
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum FaceMatchAuthError {
-    #[error(transparent)]
-    Oracle(#[from] OracleError),
-}
-
-impl From<FaceMatchAuthError> for AuthErrorKind {
-    fn from(value: FaceMatchAuthError) -> Self {
-        let FaceMatchAuthError::Oracle(oracle_error) = value;
-        match oracle_error {
-            OracleError::OracleNotReachable(_) => Self::OracleNotReachable,
-            OracleError::BadRequest(reason) => Self::OracleBadRequest(reason),
-            OracleError::UnexpectedStatusCode { .. } | OracleError::InvalidMessage(_) => {
-                Self::Internal
-            }
-        }
-    }
-}
-
-impl FaceMatchAuthError {
-    /// Log the error at the appropriate tracing level.
-    #[inline]
-    pub(crate) fn log(&self) {
-        let FaceMatchAuthError::Oracle(oracle_error) = self;
-        if matches!(oracle_error, OracleError::BadRequest(_)) {
-            tracing::warn!(err=?self, auth_error=true, "{self}");
-        } else {
-            tracing::error!(err=?self, "{self}");
-        }
-    }
-}
-
 /// Authenticator that verifies zkPassport face-match proofs by forwarding them to an oracle.
 ///
 /// Implements [`OprfRequestAuthenticator`] and is registered on the OPRF service builder
@@ -59,14 +26,6 @@ impl FaceMatchAuthenticator {
     pub fn init(proxy: OracleProxy) -> Self {
         Self { proxy }
     }
-
-    /// Send the OPRF request's blinded query and proofs to the oracle.
-    async fn authenticate_inner(
-        &self,
-        request: &OracleFaceMatchRequest,
-    ) -> Result<(), FaceMatchAuthError> {
-        Ok(self.proxy.face_match(request).await?)
-    }
 }
 
 #[async_trait]
@@ -80,9 +39,16 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
         let auth_body =
             OracleFaceMatchRequest::new(request.blinded_query, request.auth.proofs.clone());
-        self.authenticate_inner(&auth_body)
+        self.proxy
+            .face_match(&auth_body)
             .await
-            .inspect_err(FaceMatchAuthError::log)
+            .inspect_err(|err| {
+                if matches!(err, OracleError::BadRequest(_)) {
+                    tracing::warn!(?err, auth_error = true, "{err}");
+                } else {
+                    tracing::error!(?err, "{err}");
+                }
+            })
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))?;
         Ok(request.auth.oprf_key_id)
     }

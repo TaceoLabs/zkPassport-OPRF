@@ -7,7 +7,7 @@ use serde::ser::Error;
 use serde::{Deserialize, Serialize, Serializer};
 use taceo_oprf::{service::Environment, types::ark_babyjubjub};
 use tracing::instrument;
-use zkpassport_oprf_authentication::ZKPassportProofResult;
+use zkpassport_oprf_authentication::{AuthErrorKind, ZKPassportProofResult};
 
 use crate::config::RetryLayerConfig;
 
@@ -27,6 +27,18 @@ pub(crate) enum OracleError {
     /// Serde
     #[error(transparent)]
     InvalidMessage(#[from] serde_json::Error),
+}
+
+impl From<OracleError> for AuthErrorKind {
+    fn from(value: OracleError) -> Self {
+        match value {
+            OracleError::OracleNotReachable(_) => Self::OracleNotReachable,
+            OracleError::BadRequest(reason) => Self::OracleBadRequest(reason),
+            OracleError::UnexpectedStatusCode { .. } | OracleError::InvalidMessage(_) => {
+                Self::Internal
+            }
+        }
+    }
 }
 
 /// Request body sent to the oracle's face-match verification endpoint.

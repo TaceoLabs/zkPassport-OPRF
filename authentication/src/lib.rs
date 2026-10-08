@@ -100,37 +100,12 @@ pub struct FaceMatchRequestAuth {
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
-/// Authentication payload for a secret rotation request.
-///
-/// The embedded proofs are forwarded to the oracle for verification before
-/// the commitment is rotated.
-#[derive(Clone, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct SecretRotationRequest {
-    /// The identifier for which to rotate the secret.
-    #[serde(rename = "I")]
-    pub salted_identifier: SaltedIdentifier,
-    /// zkPassport proofs that attest to the user's identity.
-    pub proofs: Vec<ZKPassportProofResult>,
-}
-
 impl FaceMatchRequestAuth {
     /// Creates a new `FaceMatchRequestAuth`.
     #[must_use]
     pub fn new(oprf_key_id: OprfKeyId, proofs: Vec<ZKPassportProofResult>) -> Self {
         Self {
             oprf_key_id,
-            proofs,
-        }
-    }
-}
-
-impl SecretRotationRequest {
-    /// Creates a new `SecretRotationRequest`.
-    #[must_use]
-    pub fn new(salted_identifier: SaltedIdentifier, proofs: Vec<ZKPassportProofResult>) -> Self {
-        Self {
-            salted_identifier,
             proofs,
         }
     }

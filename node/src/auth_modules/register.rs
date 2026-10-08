@@ -16,7 +16,7 @@ use crate::services::oracle_proxy::{OracleError, OracleProxy};
 /// choose the key) and verifies the zkPassport proofs through the oracle. Implements
 /// [`OprfRequestAuthenticator`] and is registered on the OPRF service builder for the
 /// `/register` authentication module.
-pub struct RegisterAuthenticator {
+pub(crate) struct RegisterAuthenticator {
     proxy: OracleProxy,
 }
 

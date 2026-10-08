@@ -95,6 +95,7 @@ mod tests {
     use ruint::aliases::U160;
     use taceo_oprf::{
         core::oprf::BlindingFactor,
+        service::Environment,
         types::{
             OprfKeyId,
             api::{OprfRequest, OprfRequestAuthenticator as _},
@@ -123,9 +124,10 @@ mod tests {
         let proof_verifier = shared_proof_verifier().await;
         let proxy = OracleProxy::init(
             test_client()?,
-            proof_verifier.url.join("verify-oprf-auth?devmode=true")?,
+            proof_verifier.url.clone(),
+            Environment::Dev,
             RetryLayerConfig::disabled(),
-        );
+        )?;
         let service = FaceMatchAuthenticator::init(proxy);
         Ok((service, proof_verifier))
     }
@@ -282,9 +284,10 @@ mod tests {
         // returns ECONNREFUSED without waiting for a timeout.
         let proxy = OracleProxy::init(
             test_client()?,
-            "http://127.0.0.1:1/verify-oprf-auth".parse()?,
+            "http://127.0.0.1:1".parse()?,
+            Environment::Dev,
             RetryLayerConfig::disabled(),
-        );
+        )?;
         let auth_service = FaceMatchAuthenticator::init(proxy);
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);

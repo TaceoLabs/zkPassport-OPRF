@@ -16,8 +16,8 @@ pub struct ZkPassportNodeConfig {
     /// The `URL` of the oracle health check endpoint.
     pub oracle_health_check_url: Url,
 
-    /// The `URL` of the oracle verifying the face-match proofs.
-    pub oracle_verifier_url: Url,
+    /// The base `URL` of the oracle. Endpoint paths are appended to it.
+    pub oracle_base_url: Url,
 
     /// The interval in which we do health checks.
     #[serde(default = "ZkPassportNodeConfig::default_oracle_health_check_interval")]
@@ -125,12 +125,12 @@ impl ZkPassportNodeConfig {
     pub fn with_default_values(
         environment: taceo_oprf::service::Environment,
         oracle_health_check_url: Url,
-        oracle_verifier_url: Url,
+        oracle_base_url: Url,
         version_req: VersionReq,
     ) -> Self {
         Self {
             oracle_health_check_url,
-            oracle_verifier_url,
+            oracle_base_url,
             oracle_health_check_interval: Self::default_oracle_health_check_interval(),
             oracle_request_timeout: Self::default_oracle_request_timeout(),
             oracle_retry_layer: RetryLayerConfig::with_default_values(),

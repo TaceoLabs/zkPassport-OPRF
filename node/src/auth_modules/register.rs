@@ -42,9 +42,9 @@ impl OprfRequestAuthenticator for RegisterAuthenticator {
         _request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
         // TODO: forward the `blinded_query` together with the proofs (like face-match
-        // does) once `OracleProxy::registration` takes a request.
+        // does) once `OracleProxy::salted_identifier` takes a request.
         self.proxy
-            .registration()
+            .salted_identifier()
             .await
             .inspect_err(|err| {
                 if matches!(err, OracleError::BadRequest(_)) {
@@ -76,7 +76,7 @@ mod tests {
         services::oracle_proxy::OracleProxy,
     };
 
-    // TODO: once `OracleProxy::registration` sends requests to the proof-verifier, run
+    // TODO: once `OracleProxy::salted_identifier` sends requests to the proof-verifier, run
     // `success_test` against `shared_proof_verifier()` and add tests through `authenticate`
     // like for face-match (invalid proofs, missing proofs, blinded query mismatch, oracle
     // unreachable).
@@ -88,7 +88,7 @@ mod tests {
     }
 
     // Unreachable oracle (nothing listens on port 1, so requests fail immediately).
-    // `registration` is still a stub and sends no request.
+    // `salted_identifier` is still a stub and sends no request.
     fn auth_service() -> eyre::Result<RegisterAuthenticator> {
         let proxy = OracleProxy::init(
             test_client()?,

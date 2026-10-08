@@ -6903,6 +6903,7 @@ name = "taceo-zkpassport-oprf-authentication"
 version = "0.1.0"
 dependencies = [
  "ark-serialize 0.6.0",
+ "ruint",
  "serde",
  "serde_json",
  "taceo-ark-serde-compat",

@@ -5,16 +5,19 @@
 //!
 //! * [`FaceMatchRequestAuth`] — the authentication payload sent by a client,
 //!   containing an OPRF key ID and a list of zkPassport proofs.
+//! * [`RegisterRequestAuth`] — the authentication payload for passport
+//!   registration, which always uses the [`registration_oprf_key_id`].
 //! * [`ZKPassportProofResult`] — a single zkPassport proof matching the
 //!   `ProofResult` type from `@zkpassport/utils`.
 //! * [`AuthModules`] — an enum of supported authentication modules
-//!   (currently `FaceMatch`).
+//!   (`FaceMatch` and `Register`).
 //! * [`AuthErrorKind`] — authentication error variants with numeric
 //!   [`error_codes`] and conversions to the upstream
 //!   `OprfRequestAuthenticatorError`.
 
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
+use ruint::aliases::U160;
 use serde::{Deserialize, Serialize};
 use taceo_oprf::types::{
     OprfKeyId,
@@ -72,17 +75,37 @@ pub struct CommitmentRotationRequest {
     pub new_commitment: AuthCommitment,
 }
 
+/// Raw value of the global OPRF key used to derive user identifiers during registration.
+///
+/// See [`registration_oprf_key_id`].
+// TODO: replace the placeholder with the final key id.
+pub const REGISTRATION_OPRF_KEY_ID: U160 = U160::from_limbs([1, 0, 0]);
+
+/// The global OPRF key used to derive user identifiers during registration.
+///
+/// The registration module always evaluates the OPRF under this key.
+#[must_use]
+pub fn registration_oprf_key_id() -> OprfKeyId {
+    OprfKeyId::new(REGISTRATION_OPRF_KEY_ID)
+}
+
 /// Identifies the authentication module used for an OPRF request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum AuthModules {
     /// Face-match authentication using zkPassport zero-knowledge proofs.
     FaceMatch,
+    /// Passport registration, deriving the user identifier under the
+    /// [`registration_oprf_key_id`].
+    Register,
 }
 
 impl core::fmt::Display for AuthModules {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("face-match")
+        match self {
+            AuthModules::FaceMatch => f.write_str("face-match"),
+            AuthModules::Register => f.write_str("register"),
+        }
     }
 }
 
@@ -108,6 +131,26 @@ impl FaceMatchRequestAuth {
             oprf_key_id,
             proofs,
         }
+    }
+}
+
+/// Authentication payload attached to a registration OPRF request.
+///
+/// The client cannot choose the OPRF key: the OPRF node always uses the
+/// [`registration_oprf_key_id`], and verifies the embedded proofs before
+/// proceeding with the OPRF evaluation.
+#[derive(Clone, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct RegisterRequestAuth {
+    /// zkPassport proofs that attest to the user's passport.
+    pub proofs: Vec<ZKPassportProofResult>,
+}
+
+impl RegisterRequestAuth {
+    /// Creates a new `RegisterRequestAuth`.
+    #[must_use]
+    pub fn new(proofs: Vec<ZKPassportProofResult>) -> Self {
+        Self { proofs }
     }
 }
 

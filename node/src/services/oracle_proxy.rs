@@ -211,7 +211,6 @@ impl OracleProxy {
     ///
     /// No `nonce`, `challenge`, or `timestamp` is added. Nodes MUST reject a registration if a commitment for `I` is already stored, so a replay is a no-op.
     #[instrument(level = "debug", skip_all)]
-    #[expect(dead_code, reason = "is just a stub")]
     pub(crate) async fn registration_commitment(&self) -> Result<()> {
         tracing::trace!(
             "sending verify request to oracle: {}",

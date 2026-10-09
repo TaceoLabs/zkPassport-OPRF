@@ -11,6 +11,8 @@
 //!   `ProofResult` type from `@zkpassport/utils`.
 //! * [`AuthModules`] — an enum of supported authentication modules
 //!   (`FaceMatch` and `Register`).
+//! * [`RegistrationRequest`] — the request to register an identifier and
+//!   commitment after the registration OPRF evaluation.
 //! * [`AuthErrorKind`] — authentication error variants with numeric
 //!   [`error_codes`] and conversions to the upstream
 //!   `OprfRequestAuthenticatorError`.
@@ -152,6 +154,24 @@ impl RegisterRequestAuth {
     pub fn new(proofs: Vec<ZKPassportProofResult>) -> Self {
         Self { proofs }
     }
+}
+
+/// Request when registering an identifier after the registration OPRF evaluation.
+///
+/// Sent by the client to every OPRF node after it derived its identifier with the
+/// [`AuthModules::Register`] module. The node verifies the proofs, then stores
+/// `I` → `commitment`. It rejects the request if `I` is already registered.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistrationRequest {
+    /// The identifier to register
+    #[serde(rename = "I")]
+    pub salted_identifier: SaltedIdentifier,
+    /// The commitment to persist in the database
+    pub commitment: AuthCommitment,
+    /// zkPassport proofs, including the client's OPRF proof that `I` is the output of the
+    /// registration OPRF evaluation
+    // TODO: the registration circuits do not exist yet.
+    pub proofs: Vec<ZKPassportProofResult>,
 }
 
 /// A single zkPassport proof, matching the `ProofResult` type from `@zkpassport/utils`.

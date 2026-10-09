@@ -26,7 +26,10 @@ use zkpassport_oprf_authentication::AuthModules;
 use crate::{
     auth_modules::{face_match::FaceMatchAuthenticator, register::RegisterAuthenticator},
     config::ZkPassportNodeConfig,
-    services::{health_check, oracle_proxy::OracleProxy},
+    services::{
+        health_check,
+        oracle_proxy::{OracleProxyService, proof_verifier::ProofVerifierOracle},
+    },
 };
 
 pub(crate) mod api;
@@ -77,13 +80,15 @@ pub fn start(
     ));
 
     tracing::info!("init oprf request auth service..");
-    let oracle_proxy = OracleProxy::init(
-        oracle_client,
-        config.oracle_base_url,
-        node_config.environment,
-        config.oracle_retry_layer,
-    )
-    .context("while building oracle proxy")?;
+    let oracle_proxy: OracleProxyService = Arc::new(
+        ProofVerifierOracle::init(
+            oracle_client,
+            config.oracle_base_url,
+            node_config.environment,
+            config.oracle_retry_layer,
+        )
+        .context("while building oracle proxy")?,
+    );
     let face_match_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy.clone()));
     let register_auth_service = Arc::new(RegisterAuthenticator::init(oracle_proxy.clone()));
 

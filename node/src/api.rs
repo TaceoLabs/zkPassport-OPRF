@@ -6,19 +6,19 @@ use axum::{
 use tracing::instrument;
 use zkpassport_oprf_authentication::{CommitmentRotationRequest, RegistrationRequest};
 
-use crate::{ZkPassportDb, api::errors::ApiError, services::oracle_proxy::OracleProxy};
+use crate::{ZkPassportDb, api::errors::ApiError, services::oracle_proxy::OracleProxyService};
 
 pub(crate) mod errors;
 
 type ApiResult<T> = std::result::Result<T, ApiError>;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct AppState {
-    proxy: OracleProxy,
+    proxy: OracleProxyService,
     db: ZkPassportDb,
 }
 
-impl FromRef<AppState> for OracleProxy {
+impl FromRef<AppState> for OracleProxyService {
     fn from_ref(input: &AppState) -> Self {
         input.proxy.clone()
     }
@@ -32,7 +32,7 @@ impl FromRef<AppState> for ZkPassportDb {
 
 #[instrument(level = "info", skip_all)]
 async fn rotation(
-    State(proxy): State<OracleProxy>,
+    State(proxy): State<OracleProxyService>,
     State(db): State<ZkPassportDb>,
     Json(CommitmentRotationRequest {
         salted_identifier,
@@ -50,7 +50,7 @@ async fn rotation(
 
 #[instrument(level = "info", skip_all)]
 async fn registration(
-    State(proxy): State<OracleProxy>,
+    State(proxy): State<OracleProxyService>,
     State(db): State<ZkPassportDb>,
     Json(RegistrationRequest {
         salted_identifier,
@@ -68,7 +68,7 @@ async fn registration(
     Ok(())
 }
 
-pub(crate) fn routes(proxy: OracleProxy, db: ZkPassportDb) -> Router {
+pub(crate) fn routes(proxy: OracleProxyService, db: ZkPassportDb) -> Router {
     Router::new()
         .route("/registration", post(registration))
         .route("/rotation", post(rotation))

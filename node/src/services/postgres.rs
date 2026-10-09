@@ -74,7 +74,7 @@ impl ZkPassportDb {
         .bind(taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment).as_slice())
         .execute(&self.pool)
         .await
-        .map_err(|e| DbError::Internal(eyre::Report::new(e)))?;
+        .context("while inserting registration")?;
         if result.rows_affected() == 0 {
             return Err(DbError::AlreadyRegistered);
         }
@@ -106,7 +106,7 @@ impl ZkPassportDb {
                 .execute(&self.pool)
             })
             .await
-            .map_err(|e| DbError::Internal(eyre::Report::new(e)))?;
+            .context("while rotating commitment")?;
         if result.rows_affected() == 0 {
             return Err(DbError::UnknownIdentifier);
         }

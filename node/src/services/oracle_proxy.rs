@@ -211,7 +211,6 @@ impl OracleProxy {
     ///
     /// No `nonce`, `challenge`, or `timestamp` is added. Nodes MUST reject a registration if a commitment for `I` is already stored, so a replay is a no-op.
     #[instrument(level = "debug", skip_all)]
-    #[expect(dead_code, reason = "is just a stub")]
     pub(crate) async fn registration_commitment(&self) -> Result<()> {
         tracing::trace!(
             "sending verify request to oracle: {}",
@@ -313,15 +312,6 @@ impl OracleProxy {
     /// Nodes MUST check that `I` is registered before updating the mapping.
     ///
     /// Unlike [`Self::preimage_proof`], a `nonce` or `timestamp` may be desirable. Otherwise a replay could rotate the mapping back to a commitment whose secret the user has lost, locking them out. The commitment itself may serve as nonce: nodes could persist the history of commitments per `I` and reject any `y'` seen before. This also leaves an audit trail of rotations.
-    #[instrument(level = "debug", skip_all)]
-    pub(crate) async fn identifier_registration(&self) -> Result<()> {
-        tracing::trace!(
-            "sending verify request to oracle: {}",
-            self.endpoints.passport_proof
-        );
-        Ok(())
-    }
-
     #[instrument(level = "debug", skip_all)]
     pub(crate) async fn secret_rotation(&self) -> Result<()> {
         tracing::trace!(

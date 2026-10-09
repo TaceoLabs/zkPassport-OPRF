@@ -60,7 +60,7 @@ async fn registration(
 ) -> ApiResult<()> {
     // TODO: unauthenticated until the oracle check and proofs are implemented. Verify both
     // the OPRF proof and the passport proof.
-    proxy.identifier_registration().await?;
+    proxy.registration_commitment().await?;
     tracing::trace!("proof verification for registration succeeded - storing identifier now");
     db.insert_registration(salted_identifier, commitment)
         .await?;

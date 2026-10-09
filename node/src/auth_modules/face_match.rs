@@ -6,14 +6,14 @@ use taceo_oprf::types::{
 use tracing::instrument;
 use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth};
 
-use crate::services::oracle_proxy::{OracleError, OracleFaceMatchRequest, OracleProxy};
+use crate::services::oracle_proxy::{OracleError, OracleProxyService};
 
 /// Authenticator that verifies zkPassport face-match proofs by forwarding them to an oracle.
 ///
 /// Implements [`OprfRequestAuthenticator`] and is registered on the OPRF service builder
 /// for the `/face-match` authentication module.
-pub(crate) struct FaceMatchAuthenticator {
-    proxy: OracleProxy,
+pub struct FaceMatchAuthenticator {
+    proxy: OracleProxyService,
 }
 
 impl FaceMatchAuthenticator {
@@ -23,7 +23,7 @@ impl FaceMatchAuthenticator {
     /// Oracle reachability is not checked here; a separate background task
     /// polls the oracle's health endpoint (see
     /// [`crate::services::health_check`]).
-    pub fn init(proxy: OracleProxy) -> Self {
+    pub(crate) fn init(proxy: OracleProxyService) -> Self {
         Self { proxy }
     }
 }
@@ -37,10 +37,8 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
-        let auth_body =
-            OracleFaceMatchRequest::new(request.blinded_query, request.auth.proofs.clone());
         self.proxy
-            .v1_face_match(&auth_body)
+            .v1_face_match(request.blinded_query, &request.auth.proofs)
             .await
             .inspect_err(|err| {
                 if matches!(err, OracleError::BadRequest(_)) {
@@ -77,7 +75,7 @@ mod tests {
 
     use crate::{
         auth_modules::face_match::FaceMatchAuthenticator, config::RetryLayerConfig,
-        services::oracle_proxy::OracleProxy,
+        services::oracle_proxy::proof_verifier::ProofVerifierOracle,
     };
 
     fn test_client() -> eyre::Result<reqwest::Client> {
@@ -88,12 +86,12 @@ mod tests {
 
     async fn auth_service() -> eyre::Result<(FaceMatchAuthenticator, Arc<SharedProofVerifier>)> {
         let proof_verifier = shared_proof_verifier().await;
-        let proxy = OracleProxy::init(
+        let proxy = Arc::new(ProofVerifierOracle::init(
             test_client()?,
             proof_verifier.url.clone(),
             Environment::Dev,
             RetryLayerConfig::disabled(),
-        )?;
+        )?);
         let service = FaceMatchAuthenticator::init(proxy);
         Ok((service, proof_verifier))
     }
@@ -248,12 +246,12 @@ mod tests {
     async fn oracle_unreachable_test() -> eyre::Result<()> {
         // Port 1 on loopback is never open; any connection attempt immediately
         // returns ECONNREFUSED without waiting for a timeout.
-        let proxy = OracleProxy::init(
+        let proxy = Arc::new(ProofVerifierOracle::init(
             test_client()?,
             "http://127.0.0.1:1".parse()?,
             Environment::Dev,
             RetryLayerConfig::disabled(),
-        )?;
+        )?);
         let auth_service = FaceMatchAuthenticator::init(proxy);
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);

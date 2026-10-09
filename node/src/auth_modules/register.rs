@@ -8,7 +8,7 @@ use zkpassport_oprf_authentication::{
     AuthErrorKind, RegisterRequestAuth, registration_oprf_key_id,
 };
 
-use crate::services::oracle_proxy::{OracleError, OracleProxy};
+use crate::services::oracle_proxy::{OracleError, OracleProxyService};
 
 /// Authenticator for passport registration.
 ///
@@ -16,8 +16,8 @@ use crate::services::oracle_proxy::{OracleError, OracleProxy};
 /// choose the key) and verifies the zkPassport proofs through the oracle. Implements
 /// [`OprfRequestAuthenticator`] and is registered on the OPRF service builder for the
 /// `/register` authentication module.
-pub(crate) struct RegisterAuthenticator {
-    proxy: OracleProxy,
+pub struct RegisterAuthenticator {
+    proxy: OracleProxyService,
 }
 
 impl RegisterAuthenticator {
@@ -27,7 +27,7 @@ impl RegisterAuthenticator {
     /// Oracle reachability is not checked here; a separate background task
     /// polls the oracle's health endpoint (see
     /// [`crate::services::health_check`]).
-    pub fn init(proxy: OracleProxy) -> Self {
+    pub(crate) fn init(proxy: OracleProxyService) -> Self {
         Self { proxy }
     }
 }
@@ -60,44 +60,26 @@ impl OprfRequestAuthenticator for RegisterAuthenticator {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::sync::Arc;
 
     use taceo_oprf::{
         core::oprf::BlindingFactor,
-        service::Environment,
         types::api::{OprfRequest, OprfRequestAuthenticator as _},
     };
     use uuid::Uuid;
-    use zkpassport_oprf_authentication::{RegisterRequestAuth, registration_oprf_key_id};
+    use zkpassport_oprf_authentication::{
+        RegisterRequestAuth, error_codes, registration_oprf_key_id,
+    };
     use zkpassport_oprf_test_utils::fixtures::FixtureData;
 
     use crate::{
-        auth_modules::register::RegisterAuthenticator, config::RetryLayerConfig,
-        services::oracle_proxy::OracleProxy,
+        auth_modules::register::RegisterAuthenticator,
+        services::oracle_proxy::test::TestOracleProxy,
     };
 
-    // TODO: once `OracleProxy::salted_identifier` sends requests to the proof-verifier, run
-    // `success_test` against `shared_proof_verifier()` and add tests through `authenticate`
-    // like for face-match (invalid proofs, missing proofs, blinded query mismatch, oracle
-    // unreachable).
-
-    fn test_client() -> eyre::Result<reqwest::Client> {
-        Ok(reqwest::ClientBuilder::new()
-            .timeout(Duration::from_secs(10))
-            .build()?)
-    }
-
-    // Unreachable oracle (nothing listens on port 1, so requests fail immediately).
-    // `salted_identifier` is still a stub and sends no request.
-    fn auth_service() -> eyre::Result<RegisterAuthenticator> {
-        let proxy = OracleProxy::init(
-            test_client()?,
-            "http://127.0.0.1:1".parse()?,
-            Environment::Dev,
-            RetryLayerConfig::disabled(),
-        )?;
-        Ok(RegisterAuthenticator::init(proxy))
-    }
+    // TODO: once `OracleProxy::salted_identifier` sends requests to the proof-verifier, add
+    // tests against `shared_proof_verifier()` like for face-match (invalid proofs, missing
+    // proofs, blinded query mismatch, oracle unreachable).
 
     fn build_request(fixture: FixtureData) -> OprfRequest<RegisterRequestAuth> {
         let blinding_factor =
@@ -115,9 +97,24 @@ mod tests {
     async fn success_test() -> eyre::Result<()> {
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);
-        let auth_service = auth_service()?;
+        let auth_service = RegisterAuthenticator::init(Arc::new(TestOracleProxy::accept()));
         let oprf_key = auth_service.authenticate(&request).await?;
         assert_eq!(oprf_key, registration_oprf_key_id());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn oracle_rejects_test() -> eyre::Result<()> {
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let request = build_request(fixture);
+        let auth_service =
+            RegisterAuthenticator::init(Arc::new(TestOracleProxy::reject("invalid proof")));
+        let is_err = auth_service
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::ORACLE_BAD_REQUEST);
+        assert_eq!(is_err.message(), "invalid proof");
         Ok(())
     }
 }

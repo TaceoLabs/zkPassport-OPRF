@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use reqwest::StatusCode;
 use taceo_oprf::types::{ark_babyjubjub, async_trait::async_trait};
-use zkpassport_oprf_authentication::{AuthErrorKind, ZKPassportProofResult};
+use zkpassport_oprf_authentication::{AuthCommitment, AuthErrorKind, ZKPassportProofResult};
 
 pub(crate) mod proof_verifier;
 #[cfg(test)]
@@ -40,6 +40,16 @@ pub(crate) enum OracleError {
     InvalidMessage(#[from] serde_json::Error),
 }
 
+impl OracleError {
+    pub(crate) fn log(&self) {
+        if matches!(self, Self::BadRequest(_)) {
+            tracing::warn!(err=?self, auth_error = true, "{self}");
+        } else {
+            tracing::error!(err=?self, "{self}");
+        }
+    }
+}
+
 impl From<OracleError> for AuthErrorKind {
     fn from(value: OracleError) -> Self {
         match value {
@@ -56,10 +66,6 @@ impl From<OracleError> for AuthErrorKind {
 ///
 /// Every method returns `Ok(())` iff the oracle accepted the request.
 #[async_trait]
-#[expect(
-    clippy::double_must_use,
-    reason = "async_trait adds #[must_use] to the boxed futures"
-)]
 pub(crate) trait OracleProxy {
     /// First step in the registration process. Verifies that a prover is eligible to obtain a [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier) for a passport `P`.
     ///
@@ -74,7 +80,7 @@ pub(crate) trait OracleProxy {
     /// - `I = OPRF(P, OPRF_reg)`: the [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier),
     ///   the stable `BabyJubJub` point obtained by unblinding the registration response. It is
     ///   independent of the blinding factor.
-    /// - `x`, `x'`: the user's secret and its commitment, the [`AuthCommitment`](zkpassport_oprf_authentication::AuthCommitment).
+    /// - `x`, `x'`: the user's secret and its commitment, the [`AuthCommitment`].
     /// - `y`, `y'`: the replacement secret and commitment after a rotation.
     ///
     /// # Proof Statement
@@ -182,10 +188,9 @@ pub(crate) trait OracleProxy {
     /// nullifier. The nullifier is public and one-way, so nothing is gained.
     ///
     /// The zkPassport circuit takes a `current_date` for PKI-chain verification. Nodes may additionally check that it lies within a reasonable window.
-    #[expect(dead_code, reason = "is just a stub")]
-    async fn preimage_proof(&self) -> Result<()>;
+    async fn preimage_proof(&self, auth_commitment: &AuthCommitment) -> Result<()>;
 
-    /// Verifies the proof that rotates the [`AuthCommitment`](zkpassport_oprf_authentication::AuthCommitment) stored for a [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier) from `x'` to a new commitment `y'`.
+    /// Verifies the proof that rotates the [`AuthCommitment`] stored for a [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier) from `x'` to a new commitment `y'`.
     ///
     /// Rotation is the fallback for a lost secret or a front-run registration. Notation as in [`Self::salted_identifier`].
     ///

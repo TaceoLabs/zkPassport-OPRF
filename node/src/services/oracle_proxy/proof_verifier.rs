@@ -9,7 +9,7 @@ use taceo_oprf::{
     types::{ark_babyjubjub, async_trait::async_trait},
 };
 use tracing::instrument;
-use zkpassport_oprf_authentication::ZKPassportProofResult;
+use zkpassport_oprf_authentication::{AuthCommitment, ZKPassportProofResult};
 
 use crate::{
     config::RetryLayerConfig,
@@ -122,7 +122,7 @@ impl OracleProxy for ProofVerifierOracle {
     }
 
     #[instrument(level = "debug", skip_all)]
-    async fn preimage_proof(&self) -> Result<()> {
+    async fn preimage_proof(&self, _auth_commitment: &AuthCommitment) -> Result<()> {
         tracing::trace!(
             "sending verify request to oracle: {}",
             self.endpoints.passport_proof

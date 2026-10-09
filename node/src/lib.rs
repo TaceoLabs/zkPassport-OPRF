@@ -24,7 +24,10 @@ use taceo_oprf::{
 use zkpassport_oprf_authentication::AuthModules;
 
 use crate::{
-    auth_modules::{face_match::FaceMatchAuthenticator, register::RegisterAuthenticator},
+    auth_modules::{
+        face_match::FaceMatchAuthenticator, nullifier::NullifierAuthenticator,
+        register::RegisterAuthenticator,
+    },
     config::ZkPassportNodeConfig,
     services::{
         health_check,
@@ -91,6 +94,10 @@ pub fn start(
     );
     let face_match_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy.clone()));
     let register_auth_service = Arc::new(RegisterAuthenticator::init(oracle_proxy.clone()));
+    let nullifier_auth_service = Arc::new(NullifierAuthenticator::init(
+        oracle_proxy.clone(),
+        zkpassport_db.clone(),
+    ));
 
     tracing::info!("init oprf service..");
     let oprf_router = taceo_oprf::service::OprfServiceBuilder::init(
@@ -108,6 +115,10 @@ pub fn start(
     .module(
         &format!("/{}", AuthModules::Register),
         register_auth_service,
+    )
+    .module(
+        &format!("/{}", AuthModules::Nullifier),
+        nullifier_auth_service,
     )
     .build();
 

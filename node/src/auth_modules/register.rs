@@ -46,13 +46,7 @@ impl OprfRequestAuthenticator for RegisterAuthenticator {
         self.proxy
             .salted_identifier()
             .await
-            .inspect_err(|err| {
-                if matches!(err, OracleError::BadRequest(_)) {
-                    tracing::warn!(?err, auth_error = true, "{err}");
-                } else {
-                    tracing::error!(?err, "{err}");
-                }
-            })
+            .inspect_err(OracleError::log)
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))?;
         Ok(registration_oprf_key_id())
     }

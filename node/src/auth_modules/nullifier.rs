@@ -9,13 +9,13 @@ use zkpassport_oprf_authentication::{AuthErrorKind, NullifierRequestAuth};
 use crate::{
     ZkPassportDb,
     services::{
-        oracle_proxy::{OracleError, OracleProxy},
+        oracle_proxy::{OracleError, OracleProxyService},
         postgres::DbError,
     },
 };
 
 pub(crate) struct NullifierAuthenticator {
-    proxy: OracleProxy,
+    proxy: OracleProxyService,
     db: ZkPassportDb,
 }
 
@@ -60,7 +60,7 @@ impl NullifierAuthenticator {
     /// Oracle reachability is not checked here; a separate background task
     /// polls the oracle's health endpoint (see
     /// [`crate::services::health_check`]).
-    pub(crate) fn init(proxy: OracleProxy, db: ZkPassportDb) -> Self {
+    pub(crate) fn init(proxy: OracleProxyService, db: ZkPassportDb) -> Self {
         Self { proxy, db }
     }
 

@@ -7,10 +7,12 @@
 //!   containing an OPRF key ID and a list of zkPassport proofs.
 //! * [`RegisterRequestAuth`] — the authentication payload for passport
 //!   registration, which always uses the [`registration_oprf_key_id`].
+//! * [`NullifierRequestAuth`] — the authentication payload for nullifier
+//!   derivation for a registered [`SaltedIdentifier`].
 //! * [`ZKPassportProofResult`] — a single zkPassport proof matching the
 //!   `ProofResult` type from `@zkpassport/utils`.
 //! * [`AuthModules`] — an enum of supported authentication modules
-//!   (`FaceMatch` and `Register`).
+//!   (`FaceMatch`, `Register` and `Nullifier`).
 //! * [`RegistrationRequest`] — the request to register an identifier and
 //!   commitment after the registration OPRF evaluation.
 //! * [`AuthErrorKind`] — authentication error variants with numeric
@@ -100,6 +102,8 @@ pub enum AuthModules {
     /// Passport registration, deriving the user identifier under the
     /// [`registration_oprf_key_id`].
     Register,
+    /// Default nullifier authentication module proving knowledge of a secret in zk.
+    Nullifier,
 }
 
 impl core::fmt::Display for AuthModules {
@@ -107,6 +111,7 @@ impl core::fmt::Display for AuthModules {
         match self {
             AuthModules::FaceMatch => f.write_str("face-match"),
             AuthModules::Register => f.write_str("register"),
+            AuthModules::Nullifier => f.write_str("nullifier"),
         }
     }
 }
@@ -142,7 +147,6 @@ impl FaceMatchRequestAuth {
 /// [`registration_oprf_key_id`], and verifies the embedded proofs before
 /// proceeding with the OPRF evaluation.
 #[derive(Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct RegisterRequestAuth {
     /// zkPassport proofs that attest to the user's passport.
     pub proofs: Vec<ZKPassportProofResult>,
@@ -171,6 +175,24 @@ pub struct RegistrationRequest {
     /// zkPassport proofs, including the client's OPRF proof that `I` is the output of the
     /// registration OPRF evaluation
     // TODO: the registration circuits do not exist yet.
+    pub proofs: Vec<ZKPassportProofResult>,
+}
+
+/// Authentication payload attached to a nullifier OPRF request.
+///
+/// The client chooses the OPRF key, which must not be the
+/// [`registration_oprf_key_id`] (rejected with
+/// [`AuthErrorKind::RequestedOprfRegistrationKey`]). The OPRF node looks up the
+/// commitment stored for `I` and verifies the embedded proofs before proceeding
+/// with the OPRF evaluation.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct NullifierRequestAuth {
+    /// The requested `OprfKeyId`.
+    pub oprf_key_id: OprfKeyId,
+    /// The registered identifier `I` of the user.
+    #[serde(rename = "I")]
+    pub salted_identifier: SaltedIdentifier,
+    /// Proofs of knowledge of the preimage of the commitment stored for `I`.
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
@@ -216,6 +238,12 @@ pub enum AuthErrorKind {
     /// The oracle service responded with BAD REQUEST.
     #[error("oracle_bad_request")]
     OracleBadRequest(String),
+    /// Requested the OPRF registration key for nullifier creation.
+    #[error("request_oprf_reg_key")]
+    RequestedOprfRegistrationKey,
+    /// Request for an unknown [`SaltedIdentifier`].
+    #[error("unknown_identifier")]
+    UnknownIdentifier,
     /// An unexpected internal error occurred.
     #[error("internal_server_error")]
     Internal,
@@ -227,6 +255,10 @@ pub mod error_codes {
     pub const ORACLE_NOT_REACHABLE: u16 = 4500;
     /// Error code for [`super::AuthErrorKind::OracleBadRequest`].
     pub const ORACLE_BAD_REQUEST: u16 = 4501;
+    /// Error code for [`super::AuthErrorKind::RequestedOprfRegistrationKey`].
+    pub const REQUESTED_OPRF_REGISTRATION_KEY: u16 = 4502;
+    /// Error code for [`super::AuthErrorKind::UnknownIdentifier`].
+    pub const UNKNOWN_IDENTIFIER: u16 = 4503;
     /// Error code for [`super::AuthErrorKind::Internal`].
     pub const INTERNAL: u16 = 1011;
 }
@@ -236,6 +268,10 @@ impl From<AuthErrorKind> for u16 {
         match value {
             AuthErrorKind::OracleNotReachable => error_codes::ORACLE_NOT_REACHABLE,
             AuthErrorKind::OracleBadRequest(_) => error_codes::ORACLE_BAD_REQUEST,
+            AuthErrorKind::RequestedOprfRegistrationKey => {
+                error_codes::REQUESTED_OPRF_REGISTRATION_KEY
+            }
+            AuthErrorKind::UnknownIdentifier => error_codes::UNKNOWN_IDENTIFIER,
             AuthErrorKind::Internal => error_codes::INTERNAL,
         }
     }
@@ -249,6 +285,12 @@ impl From<AuthErrorKind> for OprfRequestAuthenticatorError {
             }
             AuthErrorKind::OracleBadRequest(reason) => {
                 CloseFrameMessage::new_truncate(reason.to_owned())
+            }
+            AuthErrorKind::RequestedOprfRegistrationKey => {
+                taceo_oprf::types::close_frame_message!("cannot request for registration OPRF key")
+            }
+            AuthErrorKind::UnknownIdentifier => {
+                taceo_oprf::types::close_frame_message!("unknown identifier")
             }
             AuthErrorKind::Internal => {
                 taceo_oprf::types::close_frame_message!("internal")

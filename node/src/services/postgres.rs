@@ -3,7 +3,7 @@ use eyre::Context as _;
 use sqlx::PgPool;
 use taceo_nodes_common::postgres::{CreateSchema, PostgresConfig};
 use tracing::instrument;
-use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier};
+use zkpassport_oprf_authentication::{AuthCommitment, AuthErrorKind, SaltedIdentifier};
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum DbError {
@@ -13,6 +13,26 @@ pub(crate) enum DbError {
     AlreadyRegistered,
     #[error("internal error: {0:?}")]
     Internal(#[from] eyre::Report),
+}
+
+impl DbError {
+    pub(crate) fn log(&self) {
+        match self {
+            DbError::UnknownIdentifier | DbError::AlreadyRegistered => {
+                tracing::warn!(err=?self, auth_error = true, "{self}");
+            }
+            DbError::Internal(report) => tracing::error!(err=?report, "internal DB error"),
+        }
+    }
+}
+
+impl From<DbError> for AuthErrorKind {
+    fn from(value: DbError) -> Self {
+        match value {
+            DbError::UnknownIdentifier => Self::UnknownIdentifier,
+            DbError::AlreadyRegistered | DbError::Internal(_) => Self::Internal,
+        }
+    }
 }
 
 /// The postgres DB connection that stores the user registration material.
@@ -112,6 +132,31 @@ impl ZkPassportDb {
         }
         Ok(())
     }
+
+    /// Fetches the commitment stored for `identifier`.
+    ///
+    /// # Errors
+    /// Returns [`DbError::UnknownIdentifier`] if no entry exists for `identifier`.
+    pub(crate) async fn fetch_commitment(
+        &self,
+        identifier: SaltedIdentifier,
+    ) -> Result<AuthCommitment, DbError> {
+        let id_bytes = taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier);
+        self.with_retry("fetch_commitment", || async {
+            sqlx::query_scalar(
+                "SELECT commitment FROM passport_registrations WHERE salted_identifier = $1",
+            )
+            .bind(id_bytes.as_slice())
+            .fetch_optional(&self.pool)
+            .await?
+            .map(taceo_nodes_common::postgres::from_db_ark_serialize_uncompressed)
+            .transpose()
+        })
+        .await
+        .context("while fetching commitment")?
+        .ok_or_else(|| DbError::UnknownIdentifier)
+    }
+
     pub(crate) async fn with_retry<F, Fut, T>(&self, op_name: &str, f: F) -> sqlx::Result<T>
     where
         F: Fn() -> Fut,

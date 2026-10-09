@@ -40,13 +40,7 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
         self.proxy
             .v1_face_match(request.blinded_query, &request.auth.proofs)
             .await
-            .inspect_err(|err| {
-                if matches!(err, OracleError::BadRequest(_)) {
-                    tracing::warn!(?err, auth_error = true, "{err}");
-                } else {
-                    tracing::error!(?err, "{err}");
-                }
-            })
+            .inspect_err(OracleError::log)
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))?;
         Ok(request.auth.oprf_key_id)
     }

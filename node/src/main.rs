@@ -183,7 +183,14 @@ fn main() -> ExitCode {
         .expect("Can build Tokio runtime");
 
     runtime.block_on(async {
-        let _guard = telemetry_batteries::init();
+        #[allow(
+            clippy::print_stderr,
+            reason = "cannot use tracing::error as telemetry is not installed"
+        )]
+        let Ok(_guard) = telemetry_batteries::init() else {
+            eprintln!("cannot install telemetry-batteries");
+            return ExitCode::FAILURE;
+        };
         taceo_zkpassport_oprf_node::metrics::describe_metrics();
 
         // load the config

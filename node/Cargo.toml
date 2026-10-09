@@ -31,7 +31,7 @@ sqlx = { workspace = true, features = [
 ] }
 taceo-nodes-common = { workspace = true, features = ["postgres"] }
 taceo-oprf = { workspace = true, features = ["postgres", "service"] }
-telemetry-batteries = { workspace = true, features = ["metrics-statsd"] }
+telemetry-batteries = { workspace = true, features = ["axum", "metrics-statsd"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = [
   "net",

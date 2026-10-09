@@ -3,6 +3,7 @@ use axum::{
     extract::{FromRef, State},
     routing::post,
 };
+use telemetry_batteries::{opentelemetry, tracing::middleware::TraceLayer};
 use tracing::instrument;
 use zkpassport_oprf_authentication::{CommitmentRotationRequest, RegistrationRequest};
 
@@ -72,5 +73,26 @@ pub(crate) fn routes(proxy: OracleProxyService, db: ZkPassportDb) -> Router {
     Router::new()
         .route("/registration", post(registration))
         .route("/rotation", post(rotation))
+        .layer(TraceLayer::new_for_axum().with_make_span(|req| {
+            let headers = req.headers();
+            tracing::info_span!(
+                "HTTP request",
+                http.request.method = %req.method(),
+                http.route = tracing::field::Empty,
+                network.protocol.version = ?req.version(),
+                server.address = headers.get(axum::http::header::HOST).and_then(|v| v.to_str().ok()),
+                user_agent.original = headers.get(axum::http::header::USER_AGENT).and_then(|v| v.to_str().ok()),
+                http.response.status_code = tracing::field::Empty,
+                http.status_code = tracing::field::Empty,
+                url.path = req.uri().path(),
+                url.query = req.uri().query(),
+                url.scheme = req.uri().scheme_str(),
+                otel.name = %req.method(),
+                otel.kind = ?opentelemetry::trace::SpanKind::Server,
+                otel.status_code = tracing::field::Empty,
+                exception.message = tracing::field::Empty,
+                "span.type" = "web",
+            )
+        }))
         .with_state(AppState { proxy, db })
 }

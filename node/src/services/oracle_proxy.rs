@@ -260,7 +260,7 @@ impl OracleProxy {
     /// currently stored for `I`. This rejects both arbitrary commitments and previous commitments
     /// superseded by rotation.
     ///
-    /// Verifiers MUST enforce that the requested OPRF key is NOT `OPRF_reg`. The registration OPRF key MUST only be used for compute identifiers.
+    /// Verifiers MUST enforce that the requested OPRF key is NOT `OPRF_reg`. The registration OPRF key MUST only be used for computing identifiers.
     ///
     /// No `nonce`, `challenge`, or `timestamp` is needed. A byte-for-byte replay is accepted only
     /// while `x'` still matches the currently stored commitment for `I`. It only makes the nodes

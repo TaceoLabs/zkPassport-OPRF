@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.1.0](https://github.com/TaceoLabs/zkPassport-OPRF/compare/taceo-zkpassport-oprf-node-v1.0.5...taceo-zkpassport-oprf-node-v1.1.0)
+
+### ⛰️ Features
+
+
+- *(node)* Added axum routes for non-oprf calls and some new-types - ([a0eed03](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a0eed037eab53fb3b38e9f020fd342be9714654b))
+- *(node)* Adds stubs for the proxy - ([d531423](https://github.com/TaceoLabs/zkPassport-OPRF/commit/d531423158fa585a3f99a470e40800bce2d4bff8))
+- *(node)* Add sqlx and init DB migration - ([f978c62](https://github.com/TaceoLabs/zkPassport-OPRF/commit/f978c629a4f3b4696347c12cddb791135476f017))
+- Add registration endpoint that persists identifier and commitment - ([9a45f51](https://github.com/TaceoLabs/zkPassport-OPRF/commit/9a45f51025d15c9a86ab40f6d0b4f4d2cd4f3dab))
+- Add register auth module - ([f465d00](https://github.com/TaceoLabs/zkPassport-OPRF/commit/f465d00697e6476ccac89cb9048587b8d87fd11c))
+
+### 🚜 Refactor
+
+
+- *(node)* Put oracle proxy behind a trait ([#184](https://github.com/TaceoLabs/zkPassport-OPRF/pull/184)) - ([6abe42e](https://github.com/TaceoLabs/zkPassport-OPRF/commit/6abe42e5ce38b158c12087c3c881c62b79d3d36e))
+- *(node)* Change visibility of auth-modules - ([616a70b](https://github.com/TaceoLabs/zkPassport-OPRF/commit/616a70b89756fb124d57aab5127b734a9ae64e77))
+- *(node)* Rename identifier to salted_identifier in postgres DB - ([5d3295d](https://github.com/TaceoLabs/zkPassport-OPRF/commit/5d3295dd932632b1da30a0c8524dc03bd27b1631))
+- *(node)* Drop face-match auth error and use OracleError - ([d7a340e](https://github.com/TaceoLabs/zkPassport-OPRF/commit/d7a340e5331c0ca06802bd489d9ce7b75414a59b))
+- *(node)* Add v2 service and move face-match to v1. Adds an oracle proxy - ([284b746](https://github.com/TaceoLabs/zkPassport-OPRF/commit/284b7466fcdbf696c2e8d3d93c2768da65fe0abc))
+
+### 🏗️ Build
+
+
+- Add build.rs from sqlx migrate build-script - ([827f355](https://github.com/TaceoLabs/zkPassport-OPRF/commit/827f35590c903ccc72cbe6b05bbe4a4fc4ae1d78))
+
+### 📚 Documentation
+
+
+- Added exhaustive proof statements in proxy - ([43a20c3](https://github.com/TaceoLabs/zkPassport-OPRF/commit/43a20c36e084d170d4dbaa1abd4cadf38b720f8f))
+
+### 🧪 Testing
+
+
+- Remove proof-verifier testcontainer after the last test - ([387d38a](https://github.com/TaceoLabs/zkPassport-OPRF/commit/387d38a5f6eb57aadcd5ba69165cc85c81b1cf96))
+
+### 🌀 Other
+
+
+- Fixed a typo - ([a401601](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a401601d42c4c78618d8c8831af8a39c8ba476f0))
+- Cargo fmt - ([ef2dd78](https://github.com/TaceoLabs/zkPassport-OPRF/commit/ef2dd789d42eab8984ad1ae52f71931460b97d0f))
+
+
 ## [1.0.5](https://github.com/TaceoLabs/zkPassport-OPRF/compare/taceo-zkpassport-oprf-node-v1.0.4...taceo-zkpassport-oprf-node-v1.0.5)
 
 ### 📚 Documentation

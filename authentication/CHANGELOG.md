@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.1](https://github.com/TaceoLabs/zkPassport-OPRF/compare/taceo-zkpassport-oprf-authentication-v0.1.0...taceo-zkpassport-oprf-authentication-v0.1.1)
+
+### ⛰️ Features
+
+
+- *(node)* Added axum routes for non-oprf calls and some new-types - ([a0eed03](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a0eed037eab53fb3b38e9f020fd342be9714654b))
+- *(node)* Adds stubs for the proxy - ([d531423](https://github.com/TaceoLabs/zkPassport-OPRF/commit/d531423158fa585a3f99a470e40800bce2d4bff8))
+- Add registration endpoint that persists identifier and commitment - ([9a45f51](https://github.com/TaceoLabs/zkPassport-OPRF/commit/9a45f51025d15c9a86ab40f6d0b4f4d2cd4f3dab))
+- Add register auth module - ([f465d00](https://github.com/TaceoLabs/zkPassport-OPRF/commit/f465d00697e6476ccac89cb9048587b8d87fd11c))
+
+### 🚜 Refactor
+
+
+- *(node)* Add v2 service and move face-match to v1. Adds an oracle proxy - ([284b746](https://github.com/TaceoLabs/zkPassport-OPRF/commit/284b7466fcdbf696c2e8d3d93c2768da65fe0abc))
+- Remove dead struct that was not used - ([7f9bf45](https://github.com/TaceoLabs/zkPassport-OPRF/commit/7f9bf450af84611752270527b8832c39aa491e0f))
+
+
 ## [0.1.0]
 
 ### ⛰️ Features

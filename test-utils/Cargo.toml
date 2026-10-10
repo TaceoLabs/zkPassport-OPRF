@@ -1,6 +1,6 @@
 [package]
 name = "taceo-zkpassport-oprf-test-utils"
-version = "0.1.0"
+version = "0.1.1"
 edition.workspace = true
 rust-version.workspace = true
 description = "Shared test fixtures and container harness for zkPassport OPRF."

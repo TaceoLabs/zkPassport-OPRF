@@ -3,8 +3,12 @@ default:
     @just --justfile {{ justfile() }} --list --list-heading $'Project commands:\n'
 
 [group('ci')]
+fmt:
+    cargo +nightly fmt
+
+[group('ci')]
 lint:
-    cargo fmt --all -- --check
+    cargo +nightly fmt --all -- --check
     cargo clippy --workspace --tests --examples --benches --bins -q -- -D warnings
     cargo clippy --workspace --tests --examples --benches --bins -q --all-features -- -D warnings
     RUSTDOCFLAGS='-D warnings' cargo doc --workspace -q --no-deps --document-private-items

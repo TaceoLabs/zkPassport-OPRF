@@ -16,7 +16,6 @@ use taceo_oprf::{
     types::service::NodeInformation,
 };
 use taceo_zkpassport_oprf_node::{ZkPassportDb, config::ZkPassportNodeConfig};
-
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
 use tower_http::catch_panic::CatchPanicLayer;

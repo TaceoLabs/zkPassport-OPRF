@@ -19,8 +19,7 @@
 //!   [`error_codes`] and conversions to the upstream
 //!   `OprfRequestAuthenticatorError`.
 
-use ark_serialize::CanonicalDeserialize;
-use ark_serialize::CanonicalSerialize;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ruint::aliases::U160;
 use serde::{Deserialize, Serialize};
 use taceo_oprf::types::{

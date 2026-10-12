@@ -11,6 +11,10 @@ pub(crate) enum DbError {
     UnknownIdentifier,
     #[error("identifier already registered")]
     AlreadyRegistered,
+    #[error("commitment was previously used for this identifier")]
+    CommitmentPreviouslyUsed,
+    #[error(transparent)]
+    Db(#[from] sqlx::Error),
     #[error("internal error: {0:?}")]
     Internal(#[from] eyre::Report),
 }
@@ -18,9 +22,12 @@ pub(crate) enum DbError {
 impl DbError {
     pub(crate) fn log(&self) {
         match self {
-            DbError::UnknownIdentifier | DbError::AlreadyRegistered => {
+            DbError::UnknownIdentifier
+            | DbError::AlreadyRegistered
+            | DbError::CommitmentPreviouslyUsed => {
                 tracing::warn!(err=?self, auth_error = true, "{self}");
             }
+            DbError::Db(err) => tracing::error!(err=?err, "DB error"),
             DbError::Internal(report) => tracing::error!(err=?report, "internal DB error"),
         }
     }
@@ -30,7 +37,10 @@ impl From<DbError> for AuthErrorKind {
     fn from(value: DbError) -> Self {
         match value {
             DbError::UnknownIdentifier => Self::UnknownIdentifier,
-            DbError::AlreadyRegistered | DbError::Internal(_) => Self::Internal,
+            DbError::AlreadyRegistered
+            | DbError::CommitmentPreviouslyUsed
+            | DbError::Db(_)
+            | DbError::Internal(_) => Self::Internal,
         }
     }
 }
@@ -74,8 +84,9 @@ impl ZkPassportDb {
 
     /// Registers `identifier` with `commitment`. Never overwrites an existing entry.
     ///
-    /// The insert is atomic, so of two concurrent registrations for the same `identifier`
-    /// only one is stored.
+    /// Also records `commitment` as the first entry of the commitment history of `identifier`.
+    /// Both inserts happen in a single statement, so of two concurrent registrations for the
+    /// same `identifier` only one is stored, and a rejected registration writes nothing.
     ///
     /// Not retried: a retry after a lost reply would find the row it just inserted and
     /// reject the client's own registration.
@@ -88,10 +99,20 @@ impl ZkPassportDb {
         commitment: AuthCommitment,
     ) -> Result<(), DbError> {
         let result = sqlx::query(
-            "INSERT INTO passport_registrations (salted_identifier, commitment) VALUES ($1, $2) ON CONFLICT (salted_identifier) DO NOTHING",
+            "WITH registration AS (
+                INSERT INTO passport_registrations (salted_identifier, commitment) VALUES ($1, $2)
+                ON CONFLICT (salted_identifier) DO NOTHING
+                RETURNING salted_identifier, commitment
+            )
+            INSERT INTO commitment_history (salted_identifier, commitment)
+            SELECT salted_identifier, commitment FROM registration",
         )
-        .bind(taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier).as_slice())
-        .bind(taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment).as_slice())
+        .bind(
+            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier).as_slice(),
+        )
+        .bind(
+            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment).as_slice(),
+        )
         .execute(&self.pool)
         .await
         .context("while inserting registration")?;
@@ -101,36 +122,63 @@ impl ZkPassportDb {
         Ok(())
     }
 
-    /// Replaces the commitment stored for `identifier`.
+    /// Replaces the commitment stored for `identifier` and appends it to its commitment history.
+    ///
+    /// A commitment can be used at most once per `identifier`, which prevents a replayed
+    /// rotation from restoring an earlier commitment. Rotating to the current commitment is a
+    /// no-op that succeeds, which makes retries and duplicate submissions safe.
+    ///
+    /// Runs in a transaction that locks the registration of `identifier`, so concurrent
+    /// rotations for the same `identifier` are serialized.
     ///
     /// # Errors
-    /// Returns [`DbError::UnknownIdentifier`] if no entry exists for `identifier`.
+    /// Returns [`DbError::UnknownIdentifier`] if no entry exists for `identifier`, and
+    /// [`DbError::CommitmentPreviouslyUsed`] if `commitment` was previously stored for `identifier`.
     pub(crate) async fn rotate_commitment(
         &self,
         identifier: SaltedIdentifier,
         commitment: AuthCommitment,
     ) -> Result<(), DbError> {
-        let result = self
-            .with_retry("rotate_commitment", || {
-                sqlx::query(
-                    "UPDATE passport_registrations SET commitment = $2 WHERE salted_identifier = $1",
-                )
-                .bind(
-                    taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier)
-                        .as_slice(),
-                )
-                .bind(
-                    taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment)
-                        .as_slice(),
-                )
-                .execute(&self.pool)
-            })
+        let identifier =
+            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier);
+        let commitment =
+            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment);
+        let rotate_transaction = || async {
+            let mut tx = self.pool.begin().await?;
+            let current: Option<Vec<u8>> = sqlx::query_scalar(
+                "SELECT commitment FROM passport_registrations WHERE salted_identifier = $1 FOR UPDATE",
+            )
+            .bind(identifier.as_slice())
+            .fetch_optional(&mut *tx)
+            .await?;
+            let current = current.ok_or(DbError::UnknownIdentifier)?;
+            if current == commitment.as_slice() {
+                // a retry or duplicate submission of the latest rotation - nothing to do
+                tracing::debug!("commitment is already current - nothing to rotate");
+                return Ok(());
+            }
+            let inserted = sqlx::query(
+                "INSERT INTO commitment_history (salted_identifier, commitment) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            )
+            .bind(identifier.as_slice())
+            .bind(commitment.as_slice())
+            .execute(&mut *tx)
+            .await?;
+            if inserted.rows_affected() == 0 {
+                return Err(DbError::CommitmentPreviouslyUsed);
+            }
+            sqlx::query(
+                "UPDATE passport_registrations SET commitment = $2 WHERE salted_identifier = $1",
+            )
+            .bind(identifier.as_slice())
+            .bind(commitment.as_slice())
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            Ok(())
+        };
+        self.with_retry("rotate_commitment", rotate_transaction)
             .await
-            .context("while rotating commitment")?;
-        if result.rows_affected() == 0 {
-            return Err(DbError::UnknownIdentifier);
-        }
-        Ok(())
     }
 
     /// Fetches the commitment stored for `identifier`.
@@ -151,16 +199,18 @@ impl ZkPassportDb {
             .await?
             .map(taceo_nodes_common::postgres::from_db_ark_serialize_uncompressed)
             .transpose()
+            .map_err(DbError::from)
         })
         .await
         .context("while fetching commitment")?
         .ok_or_else(|| DbError::UnknownIdentifier)
     }
 
-    pub(crate) async fn with_retry<F, Fut, T>(&self, op_name: &str, f: F) -> sqlx::Result<T>
+    /// Runs `f`, retrying it on transient [`DbError::Db`] errors. Domain errors are never retried.
+    pub(crate) async fn with_retry<F, Fut, T>(&self, op_name: &str, f: F) -> Result<T, DbError>
     where
         F: Fn() -> Fut,
-        Fut: Future<Output = sqlx::Result<T>>,
+        Fut: Future<Output = Result<T, DbError>>,
     {
         f.retry(self.backoff)
             .sleep(tokio::time::sleep)
@@ -171,21 +221,24 @@ impl ZkPassportDb {
             .await
     }
 }
-fn is_retryable_error(e: &sqlx::Error) -> bool {
+fn is_retryable_error(e: &DbError) -> bool {
     match e {
-        // structural / driver-level errors
-        sqlx::Error::PoolTimedOut
-        | sqlx::Error::Io(_)
-        | sqlx::Error::Tls(_)
-        | sqlx::Error::Protocol(_)
-        | sqlx::Error::AnyDriverError(_)
-        | sqlx::Error::WorkerCrashed
-        | sqlx::Error::BeginFailed => true,
+        DbError::Db(err) => match err {
+            // structural / driver-level errors
+            sqlx::Error::PoolTimedOut
+            | sqlx::Error::Io(_)
+            | sqlx::Error::Tls(_)
+            | sqlx::Error::Protocol(_)
+            | sqlx::Error::AnyDriverError(_)
+            | sqlx::Error::WorkerCrashed
+            | sqlx::Error::BeginFailed => true,
 
-        // serialization_failure and deadlock detected for transactions
-        sqlx::Error::Database(db_err) => {
-            matches!(db_err.code().as_deref(), Some("40001" | "40P01"))
-        }
+            // serialization_failure and deadlock detected for transactions
+            sqlx::Error::Database(db_err) => {
+                matches!(db_err.code().as_deref(), Some("40001" | "40P01"))
+            }
+            _ => false,
+        },
         _ => false,
     }
 }

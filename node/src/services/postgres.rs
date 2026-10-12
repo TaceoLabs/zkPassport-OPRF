@@ -88,38 +88,56 @@ impl ZkPassportDb {
     /// Both inserts happen in a single statement, so of two concurrent registrations for the
     /// same `identifier` only one is stored, and a rejected registration writes nothing.
     ///
-    /// Not retried: a retry after a lost reply would find the row it just inserted and
-    /// reject the client's own registration.
+    /// Registering `identifier` with its current commitment is a no-op that succeeds, which
+    /// makes retries after a lost reply and duplicate submissions safe.
     ///
     /// # Errors
-    /// Returns [`DbError::AlreadyRegistered`] if `identifier` is already registered.
+    /// Returns [`DbError::AlreadyRegistered`] if `identifier` is already registered with
+    /// another commitment.
     pub(crate) async fn insert_registration(
         &self,
         identifier: SaltedIdentifier,
         commitment: AuthCommitment,
     ) -> Result<(), DbError> {
-        let result = sqlx::query(
-            "WITH registration AS (
-                INSERT INTO passport_registrations (salted_identifier, commitment) VALUES ($1, $2)
-                ON CONFLICT (salted_identifier) DO NOTHING
-                RETURNING salted_identifier, commitment
+        let identifier =
+            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier);
+        let commitment =
+            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment);
+        let register = || async {
+            let inserted = sqlx::query(
+                "WITH registration AS (
+                    INSERT INTO passport_registrations (salted_identifier, commitment) VALUES ($1, $2)
+                    ON CONFLICT (salted_identifier) DO NOTHING
+                    RETURNING salted_identifier, commitment
+                )
+                INSERT INTO commitment_history (salted_identifier, commitment)
+                SELECT salted_identifier, commitment FROM registration",
             )
-            INSERT INTO commitment_history (salted_identifier, commitment)
-            SELECT salted_identifier, commitment FROM registration",
-        )
-        .bind(
-            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier).as_slice(),
-        )
-        .bind(
-            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment).as_slice(),
-        )
-        .execute(&self.pool)
-        .await
-        .context("while inserting registration")?;
-        if result.rows_affected() == 0 {
-            return Err(DbError::AlreadyRegistered);
-        }
-        Ok(())
+            .bind(identifier.as_slice())
+            .bind(commitment.as_slice())
+            .execute(&self.pool)
+            .await?;
+            if inserted.rows_affected() > 0 {
+                return Ok(());
+            }
+            // A separate statement, so it sees a registration committed concurrently with the
+            // insert above.
+            let current: Option<Vec<u8>> = sqlx::query_scalar(
+                "SELECT commitment FROM passport_registrations WHERE salted_identifier = $1",
+            )
+            .bind(identifier.as_slice())
+            .fetch_optional(&self.pool)
+            .await?;
+            let current = current
+                .ok_or_else(|| eyre::eyre!("registration vanished after conflicting insert"))?;
+            if current != commitment.as_slice() {
+                return Err(DbError::AlreadyRegistered);
+            }
+            // a retry or duplicate submission of this registration - nothing to do
+            tracing::debug!("identifier is already registered with this commitment");
+            Ok(())
+        };
+        self.with_retry("insert_registration", register).await
     }
 
     /// Replaces the commitment stored for `identifier` and appends it to its commitment history.

@@ -259,7 +259,77 @@ fn is_retryable_error(e: &OracleError) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use axum::{Json, Router, http::StatusCode as AxumStatus, routing::post};
+    use serde_json::json;
+
     use super::*;
+
+    /// Serves a mock oracle answering the face-match endpoint with `status` and `body`.
+    async fn mock_oracle(
+        status: AxumStatus,
+        body: serde_json::Value,
+    ) -> eyre::Result<ProofVerifierOracle> {
+        let app = Router::new().route(
+            &format!("/{FACE_MATCH_PATH}"),
+            post(move || {
+                let body = body.clone();
+                async move { (status, Json(body)) }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let url = format!("http://{}", listener.local_addr()?).parse()?;
+        tokio::spawn(async move { axum::serve(listener, app).await });
+        ProofVerifierOracle::init(
+            reqwest::Client::new(),
+            url,
+            Environment::Test,
+            RetryLayerConfig::disabled(),
+        )
+    }
+
+    async fn face_match(oracle: &ProofVerifierOracle) -> Result<()> {
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let blinding_factor = taceo_oprf::core::oprf::BlindingFactor::from_scalar(fixture.beta)
+            .expect("Invalid blinding factor");
+        let blinded_query =
+            taceo_oprf::core::oprf::client::blind_query(fixture.private_nullifier, blinding_factor)
+                .blinded_query();
+        oracle.v1_face_match(blinded_query, &fixture.proofs).await
+    }
+
+    #[tokio::test]
+    async fn face_match_ok_test() -> eyre::Result<()> {
+        let oracle = mock_oracle(AxumStatus::OK, json!({ "verified": true })).await?;
+        face_match(&oracle).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn face_match_bad_request_test() -> eyre::Result<()> {
+        let oracle = mock_oracle(
+            AxumStatus::BAD_REQUEST,
+            json!({ "verified": false, "error": "invalid proof" }),
+        )
+        .await?;
+        let err = face_match(&oracle).await.expect_err("Should fail");
+        assert!(matches!(err, OracleError::BadRequest(msg) if msg == "invalid proof"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn face_match_unexpected_status_test() -> eyre::Result<()> {
+        let oracle = mock_oracle(
+            AxumStatus::INTERNAL_SERVER_ERROR,
+            json!({ "error": "boom" }),
+        )
+        .await?;
+        let err = face_match(&oracle).await.expect_err("Should fail");
+        assert!(matches!(
+            err,
+            OracleError::UnexpectedStatusCode { status, .. } if status == StatusCode::INTERNAL_SERVER_ERROR
+        ));
+        Ok(())
+    }
 
     #[test]
     fn endpoints_from_base_url() -> eyre::Result<()> {

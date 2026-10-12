@@ -189,3 +189,22 @@ fn is_retryable_error(e: &sqlx::Error) -> bool {
         _ => false,
     }
 }
+
+#[cfg(test)]
+impl ZkPassportDb {
+    /// Connects to the shared Postgres test container using a fresh schema.
+    ///
+    /// Keep the returned handle alive as long as the DB is used.
+    pub(crate) async fn init_test() -> eyre::Result<(
+        std::sync::Arc<taceo_nodes_common::test_utils::SharedPostgres>,
+        Self,
+    )> {
+        let postgres = taceo_nodes_common::test_utils::shared_postgres_testcontainer().await?;
+        let config = PostgresConfig::with_default_values(
+            postgres.connection_string.clone().into(),
+            taceo_nodes_common::test_utils::next_test_schema(),
+        );
+        let db = Self::init(&config).await?;
+        Ok((postgres, db))
+    }
+}

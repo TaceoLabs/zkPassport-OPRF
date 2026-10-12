@@ -7,6 +7,15 @@ CREATE TABLE passport_registrations (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- every commitment ever stored for an identifier, including the current one; append-only
+CREATE TABLE commitment_history (
+    salted_identifier   BYTEA       NOT NULL REFERENCES passport_registrations (salted_identifier) ON DELETE CASCADE,
+    commitment          BYTEA       NOT NULL CHECK (octet_length(commitment) = 32),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- a commitment can be used at most once per identifier
+    PRIMARY KEY (salted_identifier, commitment)
+);
+
 CREATE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = now();

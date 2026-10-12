@@ -17,6 +17,8 @@ pub(crate) enum ApiError {
     UnknownIdentifier,
     #[error("identifier already registered")]
     AlreadyRegistered,
+    #[error("commitment was previously used for this identifier")]
+    CommitmentPreviouslyUsed,
     #[error("bad request: {0}")]
     BadRequest(String),
     #[error("oracle not reachable")]
@@ -42,6 +44,8 @@ impl From<DbError> for ApiError {
         match value {
             DbError::UnknownIdentifier => Self::UnknownIdentifier,
             DbError::AlreadyRegistered => Self::AlreadyRegistered,
+            DbError::CommitmentPreviouslyUsed => Self::CommitmentPreviouslyUsed,
+            DbError::Db(err) => Self::Internal(eyre::Report::from(err)),
             DbError::Internal(report) => Self::Internal(report),
         }
     }
@@ -52,7 +56,9 @@ impl IntoResponse for ApiError {
         let (status, message) = match &self {
             Self::BadRequest(_) => (StatusCode::BAD_REQUEST, self.to_string()),
             Self::UnknownIdentifier => (StatusCode::NOT_FOUND, self.to_string()),
-            Self::AlreadyRegistered => (StatusCode::CONFLICT, self.to_string()),
+            Self::AlreadyRegistered | Self::CommitmentPreviouslyUsed => {
+                (StatusCode::CONFLICT, self.to_string())
+            }
             Self::OracleUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
             Self::Internal(report) => {
                 tracing::error!(err = ?report, "internal error");
@@ -72,7 +78,11 @@ mod tests {
 
     #[test]
     fn status_codes() {
-        let cases: [(ApiError, StatusCode); 3] = [
+        let cases: [(ApiError, StatusCode); 4] = [
+            (
+                DbError::CommitmentPreviouslyUsed.into(),
+                StatusCode::CONFLICT,
+            ),
             (
                 OracleError::BadRequest("bad".to_owned()).into(),
                 StatusCode::BAD_REQUEST,

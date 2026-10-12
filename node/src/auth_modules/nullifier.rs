@@ -92,3 +92,133 @@ impl OprfRequestAuthenticator for NullifierAuthenticator {
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use ark_serialize::{CanonicalDeserialize as _, CanonicalSerialize as _};
+    use ruint::aliases::U160;
+    use taceo_oprf::{
+        core::oprf::BlindingFactor,
+        types::{
+            OprfKeyId,
+            api::{OprfRequest, OprfRequestAuthenticator as _},
+            ark_babyjubjub,
+        },
+    };
+    use uuid::Uuid;
+    use zkpassport_oprf_authentication::{
+        AuthCommitment, NullifierRequestAuth, SaltedIdentifier, error_codes,
+        registration_oprf_key_id,
+    };
+    use zkpassport_oprf_test_utils::fixtures::FixtureData;
+
+    use crate::{
+        ZkPassportDb, auth_modules::nullifier::NullifierAuthenticator,
+        services::oracle_proxy::test::TestOracleProxy,
+    };
+
+    fn identifier(fixture: &FixtureData) -> SaltedIdentifier {
+        let blinding_factor =
+            BlindingFactor::from_scalar(fixture.beta).expect("Invalid blinding factor");
+        let point =
+            taceo_oprf::core::oprf::client::blind_query(fixture.private_nullifier, blinding_factor)
+                .blinded_query();
+        let mut bytes = Vec::new();
+        point
+            .serialize_uncompressed(&mut bytes)
+            .expect("Can serialize");
+        SaltedIdentifier::deserialize_uncompressed(bytes.as_slice()).expect("Valid point")
+    }
+
+    fn commitment() -> AuthCommitment {
+        let mut bytes = Vec::new();
+        ark_babyjubjub::Fq::from(42u64)
+            .serialize_uncompressed(&mut bytes)
+            .expect("Can serialize");
+        AuthCommitment::deserialize_uncompressed(bytes.as_slice()).expect("Valid field element")
+    }
+
+    fn build_request(
+        fixture: FixtureData,
+        oprf_key_id: OprfKeyId,
+        salted_identifier: SaltedIdentifier,
+    ) -> OprfRequest<NullifierRequestAuth> {
+        let blinding_factor =
+            BlindingFactor::from_scalar(fixture.beta).expect("Invalid blinding factor");
+        let blinded_query =
+            taceo_oprf::core::oprf::client::blind_query(fixture.private_nullifier, blinding_factor);
+        OprfRequest {
+            request_id: Uuid::new_v4(),
+            blinded_query: blinded_query.blinded_query(),
+            auth: NullifierRequestAuth {
+                oprf_key_id,
+                salted_identifier,
+                proofs: fixture.proofs,
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn success_test() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let id = identifier(&fixture);
+        db.insert_registration(id, commitment()).await?;
+        let request = build_request(fixture, OprfKeyId::new(U160::from(2)), id);
+        let auth_service = NullifierAuthenticator::init(Arc::new(TestOracleProxy::accept()), db);
+        let oprf_key = auth_service.authenticate(&request).await?;
+        assert_eq!(oprf_key.into_inner(), 2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn registration_key_rejected_test() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let id = identifier(&fixture);
+        db.insert_registration(id, commitment()).await?;
+        let request = build_request(fixture, registration_oprf_key_id(), id);
+        let auth_service = NullifierAuthenticator::init(Arc::new(TestOracleProxy::accept()), db);
+        let err = auth_service
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(err.code(), error_codes::REQUESTED_OPRF_REGISTRATION_KEY);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn unknown_identifier_test() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let id = identifier(&fixture);
+        let request = build_request(fixture, OprfKeyId::new(U160::from(2)), id);
+        let auth_service = NullifierAuthenticator::init(Arc::new(TestOracleProxy::accept()), db);
+        let err = auth_service
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(err.code(), error_codes::UNKNOWN_IDENTIFIER);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn oracle_rejects_test() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let id = identifier(&fixture);
+        db.insert_registration(id, commitment()).await?;
+        let request = build_request(fixture, OprfKeyId::new(U160::from(2)), id);
+        let auth_service =
+            NullifierAuthenticator::init(Arc::new(TestOracleProxy::reject("invalid proof")), db);
+        let err = auth_service
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(err.code(), error_codes::ORACLE_BAD_REQUEST);
+        assert_eq!(err.message(), "invalid proof");
+        Ok(())
+    }
+}

@@ -62,169 +62,208 @@ impl From<OracleError> for AuthErrorKind {
     }
 }
 
-/// Trait that implementations of the oracle proxy must provide.
+/// Oracle that verifies the zero-knowledge proofs gating OPRF evaluations and other API calls.
 ///
-/// Every method returns `Ok(())` iff the oracle accepted the request.
+/// Every method returns `Ok(())` iff the oracle accepted the proof.
+///
+/// # Notation
+///
+/// Shared by all proof statements on this type:
+///
+/// - `P`: the passport commitment, output by the base proof as `comm_out`. A Poseidon2
+///   commitment over individually salted passport fields, among them `pn`.
+/// - `pn`: the private nullifier committed in `P`, `pn = H(dg1, eContent, sod_sig)`. It is
+///   deterministic per passport and never leaves a proof.
+/// - `r`: a nonzero blinding factor chosen by the user.
+/// - `B`: the blinded OPRF query, a blinding of `pn` under `r`.
+/// - `k_reg`: the global OPRF key, used for registration only.
+/// - `k_c`: the nullifier OPRF key of a zkPassport customer.
+/// - `I = OPRF(pn, k_reg)`: the [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier),
+///   a `BabyJubJub` point obtained by unblinding the registration response. It is independent
+///   of the blinding factor.
+/// - `pi`: the Chaum-Pedersen proof returned by the OPRF nodes, attesting to the correct
+///   evaluation under `k_reg`.
+/// - `DS_COMMIT`: the ASCII string `TACEO-zkPassport-OPRF-v2-commit` interpreted as a
+///   big-endian field element.
+/// - `commit(pn, s) = Poseidon2_t3([DS_COMMIT, pn, s])[1]`: the commitment to a secret `s`, where
+///   `Poseidon2_t3` is the BN254 Poseidon2 permutation of width 3. Including `pn` keeps the
+///   commitments of different passports unlinkable even if a user reuses a secret.
+/// - `x`, `x' = commit(pn, x)`: the user's secret and its commitment, the [`AuthCommitment`].
+///   `x` MUST be sampled uniformly at random from the field, as `x'` is public and hides `x`
+///   only by its entropy.
+/// - `y`, `y' = commit(pn, y)`: the replacement secret and its commitment after a rotation,
+///   subject to the same requirements as `x`.
+///
+/// # Proof Composition
+///
+/// Every proof verified by the oracle is composed of:
+///
+/// - **Base proof.** The zkPassport proof. It establishes that the user holds a valid
+///   government-issued document and outputs the commitment `P` to it.
+/// - **Stacked proofs.** Each additional statement is a separate proof that takes `P` as public
+///   input and opens it privately. A stacked proof is meaningful only in conjunction with the
+///   base proof that outputs the same `P`.
+///
+/// Every method MUST verify the base proof and all proofs stacked on top of it, and MUST check
+/// that all of them carry the same `P`.
+///
+/// `P` is visible to the nodes and hides `pn` iff its salts are secret. A user MUST sample the
+/// salts from a cryptographically secure source of randomness. As computing the base proof is
+/// expensive, a user MAY cache `P` across requests. A cached `P` links the first registration
+/// step to `I`, but otherwise reveals nothing beyond `I`, which is public in all later requests.
+/// It reveals neither `pn` nor the holder's identity.
+///
+/// # Identifier Proof
+///
+/// The identifier proof attests `I = OPRF(pn, k_reg)` for the `pn` committed in `P`. It takes
+/// `P` and `I` as public inputs and establishes:
+///
+/// - The user knows the opening of `P`, in particular `pn`.
+/// - The registration query is a blinding of `pn` with a nonzero blinding factor `r`.
+/// - `pi` verifies against the public key of `k_reg`, authenticating the blinded query/response
+///   pair.
+/// - Unblinding the response with `r` yields `I`.
+///
+/// A user obtains its inputs (`r`, the response and `pi`) after the first registration step (see
+/// [`RegisterAuthenticator`](crate::auth_modules::register::RegisterAuthenticator)) and stacks it
+/// on the base proof in later requests. Its public inputs are fixed for a cached `P`, so a user
+/// MAY cache the identifier proof alongside the base proof. The cache is invalidated when either
+/// `P` or the public key of `k_reg` changes.
 #[async_trait]
 pub(crate) trait OracleProxy {
-    /// First step in the registration process. Verifies that a prover is eligible to obtain a [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier) for a passport `P`.
+    /// Verifies that a user is eligible to obtain the
+    /// [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier) `I` for the passport
+    /// committed in `P`. First step of the registration process.
     ///
-    /// Consumed by [`RegisterAuthenticator`](crate::auth_modules::register::RegisterAuthenticator), which then evaluates the OPRF under the global registration key `OPRF_reg`.
+    /// Consumed by [`RegisterAuthenticator`](crate::auth_modules::register::RegisterAuthenticator),
+    /// which then evaluates the OPRF under `k_reg`.
     ///
-    /// # Notation
+    /// # Proof Composition
     ///
-    /// Shared by all proof statements on this type:
-    ///
-    /// - `P`: the passport hash.
-    /// - `OPRF_reg`: the global registration OPRF key.
-    /// - `I = OPRF(P, OPRF_reg)`: the [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier),
-    ///   the stable `BabyJubJub` point obtained by unblinding the registration response. It is
-    ///   independent of the blinding factor.
-    /// - `x`, `x'`: the user's secret and its commitment, the [`AuthCommitment`].
-    /// - `y`, `y'`: the replacement secret and commitment after a rotation.
+    /// 1. The base proof.
+    /// 2. The query proof, see below.
     ///
     /// # Proof Statement
     ///
-    /// The proof consists of the following statements:
+    /// The query proof establishes:
     ///
-    /// §1 - Ownership of passport `P`
+    /// §1 - `B` is a blinding of `pn`
     ///
-    /// The ordinary zkPassport statement: the prover holds a valid government-issued document `P`.
-    ///
-    /// §2 - The OPRF request is a blinding of `P`
-    ///
-    /// Binds the blinded OPRF request to the passport in §1 using a nonzero blinding factor,
-    /// so an OPRF evaluation can only be requested for a passport the prover owns.
+    /// The user opens `P` to `pn`, and `B` is a blinding of `pn` with a nonzero blinding factor
+    /// `r`. Hence an OPRF evaluation can only be requested for a passport the
+    /// user owns. This is the zkPassport `oprf-auth` circuit.
     ///
     /// # Notes
+    ///
+    /// The subsequent identifier proof already rejects any `I` not computed from `pn`, so §1 is
+    /// not required for soundness per se. It ensures the nodes never evaluate `k_reg` on arbitrary
+    /// inputs.
     ///
     /// No `nonce`, `challenge`, or `timestamp` is added. Replaying the proof with the same request
-    /// only recomputes the blinded response. The client unblinds it to recover the same public `I`;
-    /// replay reveals nothing about `P`.
+    /// only recomputes the blinded response, which the client unblinds to the same public `I`.
+    /// Replay reveals nothing about `pn`. A user SHOULD sample a fresh blinding factor from a
+    /// cryptographically secure source of randomness.
     async fn salted_identifier(&self) -> Result<()>;
 
-    /// Second proof of the registration process. Attests that the public `I` was computed correctly for passport `P` and that the prover knows the secret behind the submitted commitment `x'`.
+    /// Verifies that the user may register the commitment `x'` for its identifier `I`. Second
+    /// step of the registration process.
     ///
-    /// Notation as in [`Self::salted_identifier`].
+    /// # Proof Composition
+    ///
+    /// 1. The base proof.
+    /// 2. The identifier proof.
+    /// 3. The opening proof for `x'`, see below.
     ///
     /// # Proof Statement
     ///
-    /// The proof consists of the following statements:
+    /// The opening proof takes `P` and `x'` as public inputs and establishes:
     ///
-    /// §1 - Ownership of passport `P`
+    /// §1 - Knowledge of the opening of `P`
     ///
-    /// The ordinary zkPassport statement: the prover holds a valid government-issued document `P`.
+    /// The user knows the opening of `P`, in particular its salts and `pn`.
     ///
-    /// §2 - Correct computation of `I`
+    /// §2 - Knowledge of the preimage of `x'`
     ///
-    /// The public input `I` satisfies `I = OPRF(P, OPRF_reg)`. The enclosing ZK proof MUST establish
-    /// all of the following:
+    /// The user knows `x` with `x' = commit(pn, x)` for the `pn` of §1.
     ///
-    /// - The registration request is a blinding of the passport hash `P` from §1 using a nonzero
-    ///   blinding factor known to the prover.
-    /// - The Chaum-Pedersen discrete-logarithm-equality proof returned by the registration OPRF
-    ///   verifies against the trusted public key for `OPRF_reg`, authenticating that blinded
-    ///   request/response pair.
-    /// - Unblinding that response with the same blinding factor yields the public input `I`.
-    ///
-    /// §3 - `I` and `P` have the same root passport
-    ///
-    /// §1 and §2 refer to the same `P`. Implied by the statements above, stated explicitly for clarity.
-    ///
-    /// §4 - Knowledge of the preimage of `x'`
-    ///
-    /// The prover knows `x` with `x' = commit(x)`. Binds the commitment to the proof, so a replayed proof cannot register a different commitment `x̂` under the prover's `I`.
+    /// §1 binds `x'` to `P`. Anyone who observes the request, including a malicious node, knows
+    /// `P` but not its opening, and therefore cannot replace the opening proof with one for a
+    /// different commitment `x̂'`.
     ///
     /// # Notes
     ///
-    /// No `nonce`, `challenge`, or `timestamp` is added. Nodes MUST reject a registration if a commitment for `I` is already stored, so a replay is a no-op.
+    /// No `nonce`, `challenge`, or `timestamp` is added. Nodes MUST reject a registration if a
+    /// commitment for `I` is already stored, so a replay is a no-op.
     async fn registration_commitment(&self) -> Result<()>;
 
-    /// Verifies the query proof used to compute a salted nullifier. The salted nullifier is an opaque per-consumer identifier that provides sybil resistance within the zkPassport ecosystem.
+    /// Verifies that the user may request a salted nullifier, an opaque per-customer identifier
+    /// that provides sybil resistance within the zkPassport ecosystem.
     ///
-    /// Consumed by the query authentication module, which then evaluates the OPRF under the consumer's nullifier key.
+    /// Consumed by [`NullifierAuthenticator`](crate::auth_modules::nullifier::NullifierAuthenticator),
+    /// which then evaluates the OPRF on `B` under `k_c`.
     ///
-    /// Notation as in [`Self::salted_identifier`].
+    /// # Proof Composition
     ///
-    /// # Proof Statement
-    ///
-    /// The proof consists of the following statements:
-    ///
-    /// §1 - Ownership of passport `P`
-    ///
-    /// The ordinary zkPassport statement: the prover holds a valid government-issued document with hash `P`.
-    ///
-    /// §2 - Correct computation of `I`
-    ///
-    /// The public input `I` satisfies `I = OPRF(P, OPRF_reg)` using the full derivation statement
-    /// in §2 of [`Self::registration_commitment`], including registration request binding,
-    /// Chaum-Pedersen verification against the trusted registration public key, and response unblinding.
-    ///
-    /// §3 - The OPRF request is a blinding of `P`
-    ///
-    /// Binds the blinded OPRF request to §1, so an OPRF evaluation can only be requested for a passport the prover owns.
-    ///
-    /// §4 - `I`, `P`, and the blinded OPRF request have the same root passport
-    ///
-    /// §1, §2, and §3 refer to the same `P`. Implied by the statements above, stated explicitly for clarity.
-    ///
-    /// §5 - Knowledge of the preimage of `x'`
-    ///
-    /// The prover knows `x` with `x' = commit(x)` for the public input `x'`.
+    /// 1. The base proof.
+    /// 2. The identifier proof.
+    /// 3. The query proof, as in [`Self::salted_identifier`].
+    /// 4. The opening proof for `x'`, as in [`Self::registration_commitment`].
     ///
     /// # Notes
     ///
-    /// The proof alone does not establish that `x'` is currently registered for `I`. Before
-    /// authorizing the OPRF evaluation, nodes MUST look up the proof's public input `I`, reject
-    /// unknown identifiers, and require the proof's public input `x'` to equal the commitment
-    /// currently stored for `I`. This rejects both arbitrary commitments and previous commitments
-    /// superseded by rotation.
+    /// The query proof is required for sybil resistance. Without it, a registered user could
+    /// blind arbitrary inputs and obtain arbitrarily many nullifiers per customer. With it, each
+    /// passport yields exactly one nullifier per customer.
     ///
-    /// Verifiers MUST enforce that the requested OPRF key is NOT `OPRF_reg`. The registration OPRF key MUST only be used for computing identifiers.
+    /// The proofs alone do not establish that `x'` is currently registered for `I`. Before
+    /// authorizing the OPRF evaluation, nodes MUST look up `I`, reject unknown identifiers, and
+    /// require `x'` to equal the commitment currently stored for `I`. This rejects both arbitrary
+    /// commitments and commitments superseded by a rotation.
     ///
-    /// No `nonce`, `challenge`, or `timestamp` is needed. A byte-for-byte replay is accepted only
-    /// while `x'` still matches the currently stored commitment for `I`. It only makes the nodes
-    /// recompute the same blinded response, from which the client can recover the same salted
-    /// nullifier. The nullifier is public and one-way, so nothing is gained.
+    /// Nodes MUST reject requests for `k_reg`. The registration key is used exclusively for
+    /// computing identifiers.
     ///
-    /// The zkPassport circuit takes a `current_date` for PKI-chain verification. Nodes may additionally check that it lies within a reasonable window.
+    /// No `nonce`, `challenge`, or `timestamp` is needed. A replay is accepted only while `x'` is
+    /// the commitment stored for `I`, and only makes the nodes recompute the same blinded
+    /// response. The resulting nullifier is public and one-way, so nothing is gained.
+    ///
+    /// The base proof takes a `current_date` for PKI-chain verification. Nodes MAY additionally
+    /// check that it lies within a reasonable window.
     async fn preimage_proof(&self, auth_commitment: &AuthCommitment) -> Result<()>;
 
-    /// Verifies the proof that rotates the [`AuthCommitment`] stored for a [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier) from `x'` to a new commitment `y'`.
+    /// Verifies that the user may rotate the [`AuthCommitment`] stored for `I` from `x'` to `y'`.
     ///
-    /// Rotation is the fallback for a lost secret or a front-run registration. Notation as in [`Self::salted_identifier`].
+    /// Rotation is the fallback for a lost secret or a front-run registration.
+    ///
+    /// # Proof Composition
+    ///
+    /// 1. The base proof.
+    /// 2. The identifier proof.
+    /// 3. The face-match proof, see below.
+    /// 4. The opening proof for `y'`, as in [`Self::registration_commitment`] with `y` in place of
+    ///    `x`.
     ///
     /// # Proof Statement
     ///
-    /// The proof consists of the following statements:
+    /// The face-match proof establishes:
     ///
-    /// §1 - Ownership of passport `P`
+    /// §1 - Face match against `P`
     ///
-    /// The ordinary zkPassport statement: the prover holds a valid government-issued document with hash `P`.
-    ///
-    /// §2 - Correct computation of `I`
-    ///
-    /// The public input `I` satisfies `I = OPRF(P, OPRF_reg)` using the full derivation statement
-    /// in §2 of [`Self::registration_commitment`], including registration request binding,
-    /// Chaum-Pedersen verification against the trusted registration public key, and response unblinding.
-    ///
-    /// §3 - `I` and `P` have the same root passport
-    ///
-    /// §1 and §2 refer to the same `P`. Implied by the statements above, stated explicitly for clarity.
-    ///
-    /// §4 - Face match against `P`
-    ///
-    /// The face-match proof from the `v1` flow, attesting that the user performed a face match against the picture on `P`. It must bind to the same `P` as `I`. A government cannot forge it, which is what makes rotation safe against front-running.
-    ///
-    /// §5 - Knowledge of the preimage of `y'`
-    ///
-    /// The prover knows `y` with `y' = commit(y)`. Binds the new commitment to the proof, so a replayed proof cannot rotate to a different commitment.
+    /// The user performed a face match against the portrait whose DG2 hash is committed in `P`,
+    /// as in the `v1` flow. A government cannot forge this proof, which makes rotation safe
+    /// against front-running.
     ///
     /// # Notes
     ///
     /// Nodes MUST check that `I` is registered before updating the mapping.
     ///
-    /// Unlike [`Self::preimage_proof`], a `nonce` or `timestamp` may be desirable. Otherwise a replay could rotate the mapping back to a commitment whose secret the user has lost, locking them out. The commitment itself may serve as nonce: nodes could persist the history of commitments per `I` and reject any `y'` seen before. This also leaves an audit trail of rotations.
+    /// The opening proof binds `y'` to `P`. Without this binding, anyone observing the request
+    /// could replace `y'` with their own commitment and take over `I`.
+    ///
+    /// Unlike [`Self::preimage_proof`], a `nonce` or `timestamp` may be desirable. Otherwise a
+    /// replay could rotate the mapping back to a commitment whose secret the user has lost,
+    /// locking them out. The commitment itself may serve as nonce: nodes could persist the history
+    /// of commitments per `I` and reject any `y'` seen before, which also leaves an audit trail.
     async fn secret_rotation(&self) -> Result<()>;
 
     /// Verifies the proofs of a v1 face-match request.

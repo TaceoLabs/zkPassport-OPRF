@@ -24,12 +24,12 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies -- this is the caching Docker layer
-RUN cargo chef cook --release --locked -p taceo-zkpassport-oprf-node --bin taceo-zkpassport-oprf-node --recipe-path recipe.json
+RUN cargo chef cook --profile dist --locked -p taceo-zkpassport-oprf-node --bin taceo-zkpassport-oprf-node --recipe-path recipe.json
 # Build application
 COPY . .
 ARG GIT_HASH
 ENV GIT_HASH=$GIT_HASH
-RUN cargo build --release --locked -p taceo-zkpassport-oprf-node --bin taceo-zkpassport-oprf-node
+RUN cargo build --profile dist --locked -p taceo-zkpassport-oprf-node --bin taceo-zkpassport-oprf-node
 
 # Build healthcheck (statically linked against musl so it runs on scratch)
 FROM rust:1.91-alpine3.21 AS healthcheck-builder
@@ -48,5 +48,5 @@ WORKDIR /app
 USER 65532:65532
 COPY --from=healthcheck-builder /usr/local/cargo/bin/simple-web-healthcheck /healthcheck
 COPY --from=builder /etc/ssl/certs/ /etc/ssl/certs/
-COPY --from=builder /app/target/release/taceo-zkpassport-oprf-node /app/taceo-zkpassport-oprf-node
+COPY --from=builder /app/target/dist/taceo-zkpassport-oprf-node /app/taceo-zkpassport-oprf-node
 ENTRYPOINT ["/app/taceo-zkpassport-oprf-node"]

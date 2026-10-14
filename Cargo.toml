@@ -69,16 +69,19 @@ unwrap_used = "deny"
 [workspace.lints.rust]
 missing_docs = "deny"
 
-[profile.release]
-lto = true
-codegen-units = 1
-
 # This profile can be used for CI in pull requests.
 [profile.ci-dev]
 inherits = "dev"
 opt-level = 1
 debug = true
 incremental = false
+
+# This profile should be used for final build in the docker image.
+# cargo build --profile dist
+[profile.dist]
+inherits = "release"
+lto = true
+codegen-units = 1
 
 [profile.profiling]
 inherits = "bench"

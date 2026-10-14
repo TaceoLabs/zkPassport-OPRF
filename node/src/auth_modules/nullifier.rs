@@ -57,9 +57,6 @@ impl NullifierAuthenticator {
     /// Initialize the authenticator.
     ///
     /// Stores the oracle proxy used for subsequent proof-verification requests.
-    /// Oracle reachability is not checked here; a separate background task
-    /// polls the oracle's health endpoint (see
-    /// [`crate::services::health_check`]).
     pub(crate) fn init(proxy: OracleProxyService, db: ZkPassportDb) -> Self {
         Self { proxy, db }
     }

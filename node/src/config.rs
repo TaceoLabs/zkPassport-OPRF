@@ -13,24 +13,15 @@ use taceo_oprf::service::{VersionReq, config::OprfNodeServiceConfig};
 #[derive(Clone, Debug, Deserialize)]
 #[non_exhaustive]
 pub struct ZkPassportNodeConfig {
-    /// The `URL` of the oracle health check endpoint.
-    pub oracle_health_check_url: Url,
-
     /// The base `URL` of the oracle. Endpoint paths are appended to it.
     pub oracle_base_url: Url,
-
-    /// The interval in which we do health checks.
-    #[serde(default = "ZkPassportNodeConfig::default_oracle_health_check_interval")]
-    #[serde(with = "humantime_serde")]
-    pub oracle_health_check_interval: Duration,
 
     /// Request timeout when talking to the verifier oracle.
     #[serde(default = "ZkPassportNodeConfig::default_oracle_request_timeout")]
     #[serde(with = "humantime_serde")]
     pub oracle_request_timeout: Duration,
 
-    /// The retry layer config for requests to the verifier oracle, used by
-    /// both the face-match verify requests and the health-check task.
+    /// The retry layer config for requests to the verifier oracle.
     #[serde(rename = "retry")]
     #[serde(default)]
     pub oracle_retry_layer: RetryLayerConfig,
@@ -66,10 +57,6 @@ pub struct RetryLayerConfig {
 }
 
 impl ZkPassportNodeConfig {
-    fn default_oracle_health_check_interval() -> Duration {
-        Duration::from_mins(5)
-    }
-
     fn default_oracle_request_timeout() -> Duration {
         Duration::from_secs(25)
     }
@@ -124,14 +111,11 @@ impl ZkPassportNodeConfig {
     #[must_use]
     pub fn with_default_values(
         environment: taceo_oprf::service::Environment,
-        oracle_health_check_url: Url,
         oracle_base_url: Url,
         version_req: VersionReq,
     ) -> Self {
         Self {
-            oracle_health_check_url,
             oracle_base_url,
-            oracle_health_check_interval: Self::default_oracle_health_check_interval(),
             oracle_request_timeout: Self::default_oracle_request_timeout(),
             oracle_retry_layer: RetryLayerConfig::with_default_values(),
             node_config: OprfNodeServiceConfig::with_default_values(environment, version_req),

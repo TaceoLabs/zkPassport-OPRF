@@ -2,13 +2,11 @@
 //!
 //! This crate provides the [`start`] function, which:
 //!
-//! 1. Spawns a background oracle health-check task that periodically polls
-//!    the oracle's health endpoint and logs the result (see `services::health_check`).
-//! 2. Initializes the `FaceMatchAuthenticator` and the `RegisterAuthenticator`
+//! 1. Initializes the `FaceMatchAuthenticator` and the `RegisterAuthenticator`
 //!    that verify zkPassport proofs through an oracle.
-//! 3. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
+//! 2. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
 //!    and registers the face-match and register authentication modules.
-//! 4. Nests the HTTP API (`/api`, e.g. commitment rotation backed by the
+//! 3. Nests the HTTP API (`/api`, e.g. commitment rotation backed by the
 //!    passport registrations DB) next to the OPRF routes.
 //!
 //! The returned Axum router is consumed by the binary in `main.rs`.
@@ -29,10 +27,7 @@ use crate::{
         register::RegisterAuthenticator,
     },
     config::ZkPassportNodeConfig,
-    services::{
-        health_check,
-        oracle_proxy::{OracleProxyService, proof_verifier::ProofVerifierOracle},
-    },
+    services::oracle_proxy::{OracleProxyService, proof_verifier::ProofVerifierOracle},
 };
 
 pub(crate) mod api;
@@ -56,9 +51,7 @@ pub use services::postgres::ZkPassportDb;
 /// The Axum [`Router`] to be served by the HTTP listener.
 ///
 /// # Errors
-/// Returns an error if the oracle client cannot be initialized. The oracle
-/// health-check task is spawned detached and only logs its results; it does not
-/// affect the return value of this function.
+/// Returns an error if the oracle client cannot be initialized.
 pub fn start(
     config: ZkPassportNodeConfig,
     secret_manager: SecretManagerService,
@@ -74,13 +67,6 @@ pub fn start(
         .timeout(config.oracle_request_timeout)
         .build()
         .context("while building reqwest client")?;
-
-    tokio::task::spawn(health_check::oracle_health_check_task(
-        oracle_client.clone(),
-        config.oracle_health_check_interval,
-        config.oracle_health_check_url,
-        config.oracle_retry_layer,
-    ));
 
     tracing::info!("init oprf request auth service..");
     let oracle_proxy: OracleProxyService = Arc::new(

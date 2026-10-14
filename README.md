@@ -95,23 +95,6 @@ In the `dev` environment, `?devmode=true` is added to every endpoint. Connection
 |----------|----------|-------------|
 | `TACEO_OPRF_NODE__SERVICE__ORACLE_BASE_URL` | yes | Base URL of the oracle (e.g. `http://127.0.0.1:8080`) |
 
-### Oracle Health Check
-
-At startup the node spawns a background task that **polls the proof-verifier oracle**
-on a fixed interval and logs the result. This is an outbound check — the node itself
-exposes no `/health` endpoint.
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `TACEO_OPRF_NODE__SERVICE__ORACLE_HEALTH_CHECK_URL` | yes | — | URL of the oracle's health endpoint (e.g. `http://127.0.0.1:8080`) |
-| `TACEO_OPRF_NODE__SERVICE__ORACLE_HEALTH_CHECK_INTERVAL` | no | `5m` | Poll interval in [humantime](https://docs.rs/humantime) format (e.g. `30s`, `2m`) |
-
-Each poll logs one of three outcomes via `tracing`:
-
-* **HTTP 200** — `INFO oracle healthy`
-* **Connection error** — `ERROR cannot reach oracle health url`
-* **Non-200 response** — `ERROR oracle health check returned non-200 status` with status code and response body
-
 ## Databases
 
 OPRF key shares are stored in a PostgreSQL schema managed by the upstream `taceo-oprf` secret manager. A separate schema stores passport registrations and is initialized and migrated (from `node/migrations`) when the node starts. Both schemas can use the same PostgreSQL database. The node needs write access to the registrations schema.

@@ -78,7 +78,8 @@ mod tests {
 
     #[test]
     fn status_codes() {
-        let cases: [(ApiError, StatusCode); 4] = [
+        let cases: [(ApiError, StatusCode); 5] = [
+            (DbError::UnknownIdentifier.into(), StatusCode::NOT_FOUND),
             (
                 DbError::CommitmentPreviouslyUsed.into(),
                 StatusCode::CONFLICT,

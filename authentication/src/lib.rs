@@ -96,7 +96,7 @@ impl AuthCommitment {
 }
 
 /// Request when sending a rotation request.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitmentRotationRequest {
     /// The identifier for which to rotate the secret
     #[serde(rename = "I")]
@@ -223,7 +223,7 @@ pub struct NullifierRequestAuth {
 }
 
 /// A single zkPassport proof, matching the `ProofResult` type from `@zkpassport/utils`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ZKPassportProofResult {
@@ -324,5 +324,164 @@ impl From<AuthErrorKind> for OprfRequestAuthenticatorError {
         };
         let code = u16::from(value);
         OprfRequestAuthenticatorError::with_message(code, message)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::{Serialize, de::DeserializeOwned};
+    use serde_json::json;
+    use taceo_oprf::types::api::CLOSE_FRAME_MAX_LENGTH;
+
+    use super::*;
+
+    /// Asserts that `value` serializes to `expected` and that `expected` deserializes back to it.
+    ///
+    /// Compares against fixed JSON, as a round trip alone passes after renaming a field.
+    fn assert_wire_format<T: Serialize + DeserializeOwned>(
+        value: &T,
+        expected: &serde_json::Value,
+    ) {
+        assert_eq!(&serde_json::to_value(value).expect("serializes"), expected);
+        let parsed: T = serde_json::from_value(expected.clone()).expect("deserializes");
+        assert_eq!(&serde_json::to_value(parsed).expect("serializes"), expected);
+    }
+
+    fn identifier() -> SaltedIdentifier {
+        SaltedIdentifier::from(ark_babyjubjub::EdwardsAffine::default())
+    }
+
+    fn commitment(n: u64) -> AuthCommitment {
+        AuthCommitment::from(ark_babyjubjub::Fq::from(n))
+    }
+
+    fn proof() -> ZKPassportProofResult {
+        ZKPassportProofResult {
+            proof: Some("0xproof".to_owned()),
+            vkey_hash: Some("0xvkey".to_owned()),
+            version: Some("1.0.0".to_owned()),
+            name: Some("outer_count_4".to_owned()),
+            committed_inputs: Some(json!({ "key": "value" })),
+            index: Some(0),
+            total: Some(1),
+        }
+    }
+
+    #[test]
+    fn registration_request_wire_format() {
+        let request = RegistrationRequest {
+            salted_identifier: identifier(),
+            commitment: commitment(42),
+            proofs: vec![proof()],
+        };
+        let expected = json!({
+            "I": ["0", "1"],
+            "commitment": "42",
+            "proofs": [{
+                "proof": "0xproof",
+                "vkeyHash": "0xvkey",
+                "version": "1.0.0",
+                "name": "outer_count_4",
+                "committedInputs": { "key": "value" },
+                "index": 0,
+                "total": 1,
+            }],
+        });
+        assert_wire_format(&request, &expected);
+    }
+
+    #[test]
+    fn commitment_rotation_request_wire_format() {
+        let request = CommitmentRotationRequest {
+            salted_identifier: identifier(),
+            new_commitment: commitment(43),
+        };
+        let expected = json!({
+            "I": ["0", "1"],
+            "new_commitment": "43",
+        });
+        assert_wire_format(&request, &expected);
+    }
+
+    #[test]
+    fn register_request_auth_wire_format() {
+        let auth = RegisterRequestAuth::new(vec![]);
+        assert_wire_format(&auth, &json!({ "proofs": [] }));
+    }
+
+    #[test]
+    fn nullifier_request_auth_wire_format() {
+        let auth = NullifierRequestAuth {
+            oprf_key_id: OprfKeyId::new(U160::from(7)),
+            salted_identifier: identifier(),
+            proofs: vec![],
+        };
+        let expected = json!({
+            "oprf_key_id": "0x7",
+            "I": ["0", "1"],
+            "proofs": [],
+        });
+        assert_wire_format(&auth, &expected);
+    }
+
+    #[test]
+    fn auth_error_close_frames() {
+        // literal codes, as clients match on the numbers and not on the constants
+        let cases = [
+            (
+                AuthErrorKind::OracleNotReachable,
+                4500,
+                "oracle not reachable - try again later",
+            ),
+            (
+                AuthErrorKind::OracleBadRequest("invalid proof".to_owned()),
+                4501,
+                "invalid proof",
+            ),
+            (
+                AuthErrorKind::RequestedOprfRegistrationKey,
+                4502,
+                "cannot request for registration OPRF key",
+            ),
+            (AuthErrorKind::UnknownIdentifier, 4503, "unknown identifier"),
+            (AuthErrorKind::Internal, 1011, "internal"),
+        ];
+        for (kind, code, message) in cases {
+            let err = OprfRequestAuthenticatorError::from(kind);
+            assert_eq!(err.code(), code);
+            assert_eq!(err.message(), message);
+        }
+    }
+
+    #[test]
+    fn oracle_bad_request_reason_is_truncated() {
+        // multi-byte characters, so truncation must respect char boundaries
+        let reason = "ä".repeat(100);
+        let err =
+            OprfRequestAuthenticatorError::from(AuthErrorKind::OracleBadRequest(reason.clone()));
+        assert!(err.message().len() <= CLOSE_FRAME_MAX_LENGTH);
+        let truncated = err.message().strip_suffix("...").expect("truncated");
+        assert!(reason.starts_with(truncated));
+    }
+
+    #[test]
+    fn salted_identifier_rejects_invalid_points() {
+        // (1, 1) is not on the curve
+        serde_json::from_value::<SaltedIdentifier>(json!(["1", "1"])).expect_err("rejected");
+        // (0, -1) is on the curve but has order 2, so it is not in the prime-order subgroup
+        let p_minus_one =
+            "21888242871839275222246405745257275088548364400416034343698204186575808495616";
+        serde_json::from_value::<SaltedIdentifier>(json!(["0", p_minus_one]))
+            .expect_err("rejected");
+        serde_json::from_value::<SaltedIdentifier>(json!(["0", "1"])).expect("accepted");
+    }
+
+    #[test]
+    fn auth_commitment_rejects_non_canonical_values() {
+        let p = "21888242871839275222246405745257275088548364400416034343698204186575808495617";
+        serde_json::from_value::<AuthCommitment>(json!(p)).expect_err("rejected");
+        // a signed parser would accept this as p - 1
+        serde_json::from_value::<AuthCommitment>(json!("-1")).expect_err("rejected");
+        serde_json::from_value::<AuthCommitment>(json!("42")).expect("accepted");
     }
 }

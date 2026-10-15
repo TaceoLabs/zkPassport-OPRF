@@ -259,10 +259,26 @@ fn is_retryable_error(e: &OracleError) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
+
     use axum::{Json, Router, http::StatusCode as AxumStatus, routing::post};
     use serde_json::json;
 
     use super::*;
+
+    /// Serves `app` and returns a [`ProofVerifierOracle`] pointing at it.
+    async fn serve(app: Router, retry: RetryLayerConfig) -> eyre::Result<ProofVerifierOracle> {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let url = format!("http://{}", listener.local_addr()?).parse()?;
+        tokio::spawn(async move { axum::serve(listener, app).await });
+        ProofVerifierOracle::init(reqwest::Client::new(), url, Environment::Test, retry)
+    }
 
     /// Serves a mock oracle answering the face-match endpoint with `status` and `body`.
     async fn mock_oracle(
@@ -276,15 +292,7 @@ mod tests {
                 async move { (status, Json(body)) }
             }),
         );
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let url = format!("http://{}", listener.local_addr()?).parse()?;
-        tokio::spawn(async move { axum::serve(listener, app).await });
-        ProofVerifierOracle::init(
-            reqwest::Client::new(),
-            url,
-            Environment::Test,
-            RetryLayerConfig::disabled(),
-        )
+        serve(app, RetryLayerConfig::disabled()).await
     }
 
     async fn face_match(oracle: &ProofVerifierOracle) -> Result<()> {
@@ -317,6 +325,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn face_match_bad_request_without_reason_test() -> eyre::Result<()> {
+        let oracle = mock_oracle(AxumStatus::BAD_REQUEST, json!({ "verified": false })).await?;
+        let err = face_match(&oracle).await.expect_err("Should fail");
+        assert!(matches!(err, OracleError::BadRequest(msg) if msg == "unknown"));
+
+        let app = Router::new().route(
+            &format!("/{FACE_MATCH_PATH}"),
+            post(|| async { (AxumStatus::BAD_REQUEST, "not json") }),
+        );
+        let oracle = serve(app, RetryLayerConfig::disabled()).await?;
+        let err = face_match(&oracle).await.expect_err("Should fail");
+        assert!(matches!(err, OracleError::BadRequest(msg) if msg == "unknown"));
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn face_match_unexpected_status_test() -> eyre::Result<()> {
         let oracle = mock_oracle(
             AxumStatus::INTERNAL_SERVER_ERROR,
@@ -328,6 +352,122 @@ mod tests {
             err,
             OracleError::UnexpectedStatusCode { status, .. } if status == StatusCode::INTERNAL_SERVER_ERROR
         ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn face_match_unreachable_test() -> eyre::Result<()> {
+        // Port 1 on loopback is never open; any connection attempt immediately
+        // returns ECONNREFUSED without waiting for a timeout.
+        let oracle = ProofVerifierOracle::init(
+            reqwest::Client::new(),
+            "http://127.0.0.1:1".parse()?,
+            Environment::Test,
+            RetryLayerConfig::disabled(),
+        )?;
+        let err = face_match(&oracle).await.expect_err("Should fail");
+        assert!(matches!(err, OracleError::OracleNotReachable(err) if err.is_connect()));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn face_match_request_body_test() -> eyre::Result<()> {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let app = Router::new().route(
+            &format!("/{FACE_MATCH_PATH}"),
+            post(move |Json(body): Json<serde_json::Value>| async move {
+                tx.send(body).expect("receiver alive");
+                (AxumStatus::OK, Json(json!({ "verified": true })))
+            }),
+        );
+        let oracle = serve(app, RetryLayerConfig::disabled()).await?;
+        face_match(&oracle).await?;
+        let body = rx.recv().await.expect("oracle received a request");
+        // the expected values were produced by zkPassport, not by our serialization
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_json();
+        assert_eq!(
+            body,
+            json!({
+                "blinded_unique_identifier": fixture["blinded_unique_identifier"],
+                "proofs": fixture["proofs"],
+            })
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn face_match_retries_test() -> eyre::Result<()> {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let app = Router::new().route(
+            &format!("/{FACE_MATCH_PATH}"),
+            post({
+                let calls = Arc::clone(&calls);
+                move || async move {
+                    if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                        (AxumStatus::SERVICE_UNAVAILABLE, Json(json!({})))
+                    } else {
+                        (AxumStatus::OK, Json(json!({ "verified": true })))
+                    }
+                }
+            }),
+        );
+        let retry = RetryLayerConfig {
+            verifier_request_min_delay: Duration::from_millis(1),
+            verifier_request_max_delay: Duration::from_millis(1),
+            verifier_request_max_attempts: 1,
+        };
+        let oracle = serve(app, retry).await?;
+        face_match(&oracle).await?;
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retryable_errors() -> eyre::Result<()> {
+        let status_error = |status| OracleError::UnexpectedStatusCode {
+            status,
+            body: String::new(),
+        };
+        for status in [
+            StatusCode::REQUEST_TIMEOUT,
+            StatusCode::TOO_MANY_REQUESTS,
+            StatusCode::BAD_GATEWAY,
+            StatusCode::SERVICE_UNAVAILABLE,
+            StatusCode::GATEWAY_TIMEOUT,
+        ] {
+            assert!(is_retryable_error(&status_error(status)), "{status}");
+        }
+        for status in [
+            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::NOT_FOUND,
+            StatusCode::UNAUTHORIZED,
+        ] {
+            assert!(!is_retryable_error(&status_error(status)), "{status}");
+        }
+        assert!(!is_retryable_error(&OracleError::BadRequest(
+            "invalid proof".to_owned()
+        )));
+        let invalid_json = serde_json::from_str::<serde_json::Value>("{").expect_err("not JSON");
+        assert!(!is_retryable_error(&OracleError::InvalidMessage(
+            invalid_json
+        )));
+
+        // Port 1 on loopback is never open, see `face_match_unreachable_test`.
+        let connect_error = reqwest::Client::new()
+            .get("http://127.0.0.1:1")
+            .send()
+            .await
+            .expect_err("connection refused");
+        assert!(is_retryable_error(&OracleError::OracleNotReachable(
+            connect_error
+        )));
+        let builder_error = reqwest::Client::new()
+            .get("not a url")
+            .build()
+            .expect_err("invalid URL");
+        assert!(!is_retryable_error(&OracleError::OracleNotReachable(
+            builder_error
+        )));
         Ok(())
     }
 

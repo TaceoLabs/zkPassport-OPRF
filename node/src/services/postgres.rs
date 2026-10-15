@@ -468,6 +468,59 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn concurrent_identical_registrations_all_succeed() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let (id, c1) = (identifier(1), commitment(1));
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                let db = db.clone();
+                tokio::spawn(async move { db.insert_registration(id, c1).await })
+            })
+            .collect();
+        for h in handles {
+            h.await??;
+        }
+        assert_eq!(db.fetch_commitment(id).await?, c1);
+        assert_eq!(history(&db, id).await, vec![c1]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn concurrent_identical_rotations_all_succeed() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let (id, c1, c2) = (identifier(1), commitment(1), commitment(2));
+        db.insert_registration(id, c1).await?;
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                let db = db.clone();
+                tokio::spawn(async move { db.rotate_commitment(id, c2).await })
+            })
+            .collect();
+        for h in handles {
+            h.await??;
+        }
+        assert_eq!(db.fetch_commitment(id).await?, c2);
+        assert_eq!(history(&db, id).await, sorted(vec![c1, c2]));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn registration_replay_after_rotation_rejected() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let (id, c1, c2) = (identifier(1), commitment(1), commitment(2));
+        db.insert_registration(id, c1).await?;
+        db.rotate_commitment(id, c2).await?;
+        let err = db
+            .insert_registration(id, c1)
+            .await
+            .expect_err("should fail");
+        assert!(matches!(err, DbError::AlreadyRegistered));
+        assert_eq!(db.fetch_commitment(id).await?, c2);
+        assert_eq!(history(&db, id).await, sorted(vec![c1, c2]));
+        Ok(())
+    }
+
     #[test]
     fn retryable_errors() {
         assert!(is_retryable_error(&DbError::Db(sqlx::Error::PoolTimedOut)));

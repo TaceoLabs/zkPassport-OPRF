@@ -16,7 +16,9 @@ use std::sync::Arc;
 use axum::Router;
 use eyre::Context;
 use taceo_oprf::{
-    service::{StartedServices, secret_manager::SecretManagerService},
+    service::{
+        StartedServices, config::OprfNodeServiceConfig, secret_manager::SecretManagerService,
+    },
     types::service::NodeInformation,
 };
 use zkpassport_oprf_authentication::AuthModules;
@@ -35,6 +37,8 @@ pub(crate) mod auth_modules;
 pub mod config;
 pub mod metrics;
 pub(crate) mod services;
+#[cfg(test)]
+mod tests;
 
 pub use services::postgres::ZkPassportDb;
 
@@ -59,9 +63,6 @@ pub fn start(
     node_information: &NodeInformation,
     version_str: String,
 ) -> eyre::Result<axum::Router> {
-    let node_config = config.node_config;
-    let started_services = StartedServices::default();
-
     // we use the client-builder to avoid panic if we cannot install tls backend
     let oracle_client = reqwest::ClientBuilder::new()
         .timeout(config.oracle_request_timeout)
@@ -73,11 +74,30 @@ pub fn start(
         ProofVerifierOracle::init(
             oracle_client,
             config.oracle_base_url,
-            node_config.environment,
+            config.node_config.environment,
             config.oracle_retry_layer,
         )
         .context("while building oracle proxy")?,
     );
+    Ok(router(
+        config.node_config,
+        oracle_proxy,
+        secret_manager,
+        zkpassport_db,
+        node_information,
+        version_str,
+    ))
+}
+
+/// Wires the authentication modules and the HTTP API around `oracle_proxy`.
+fn router(
+    node_config: OprfNodeServiceConfig,
+    oracle_proxy: OracleProxyService,
+    secret_manager: SecretManagerService,
+    zkpassport_db: ZkPassportDb,
+    node_information: &NodeInformation,
+    version_str: String,
+) -> Router {
     let face_match_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy.clone()));
     let register_auth_service = Arc::new(RegisterAuthenticator::init(oracle_proxy.clone()));
     let nullifier_auth_service = Arc::new(NullifierAuthenticator::init(
@@ -89,7 +109,7 @@ pub fn start(
     let oprf_router = taceo_oprf::service::OprfServiceBuilder::init(
         node_config,
         secret_manager,
-        started_services.clone(),
+        StartedServices::default(),
         node_information,
         version_str,
     )
@@ -108,7 +128,7 @@ pub fn start(
     )
     .build();
 
-    Ok(Router::new()
+    Router::new()
         .nest("/api", api::routes(oracle_proxy, zkpassport_db))
-        .merge(oprf_router))
+        .merge(oprf_router)
 }

@@ -284,6 +284,11 @@ mod tests {
             let db = Self::init(&config).await?;
             Ok((postgres, db))
         }
+
+        /// Closes the pool, so every later query fails with a non-retryable DB error.
+        pub(crate) async fn close_test(&self) {
+            self.pool.close().await;
+        }
     }
 
     fn identifier(n: u64) -> SaltedIdentifier {

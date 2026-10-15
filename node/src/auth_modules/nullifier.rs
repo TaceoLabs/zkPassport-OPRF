@@ -111,8 +111,9 @@ mod tests {
     use zkpassport_oprf_test_utils::fixtures::FixtureData;
 
     use crate::{
-        ZkPassportDb, auth_modules::nullifier::NullifierAuthenticator,
-        services::oracle_proxy::test::TestOracleProxy,
+        ZkPassportDb,
+        auth_modules::nullifier::NullifierAuthenticator,
+        services::oracle_proxy::test::{OracleCall, TestOracleProxy},
     };
 
     fn identifier(fixture: &FixtureData) -> SaltedIdentifier {
@@ -155,9 +156,15 @@ mod tests {
         let id = identifier(&fixture);
         db.insert_registration(id, commitment()).await?;
         let request = build_request(fixture, OprfKeyId::new(U160::from(2)), id);
-        let auth_service = NullifierAuthenticator::init(Arc::new(TestOracleProxy::accept()), db);
+        let oracle = Arc::new(TestOracleProxy::accept());
+        let auth_service = NullifierAuthenticator::init(oracle.clone(), db);
         let oprf_key = auth_service.authenticate(&request).await?;
         assert_eq!(oprf_key.into_inner(), 2);
+        // the oracle verifies the preimage proof against the commitment stored for `I`
+        assert_eq!(
+            oracle.calls(),
+            vec![OracleCall::PreimageProof(commitment())]
+        );
         Ok(())
     }
 
@@ -168,12 +175,14 @@ mod tests {
         let id = identifier(&fixture);
         db.insert_registration(id, commitment()).await?;
         let request = build_request(fixture, registration_oprf_key_id(), id);
-        let auth_service = NullifierAuthenticator::init(Arc::new(TestOracleProxy::accept()), db);
+        let oracle = Arc::new(TestOracleProxy::accept());
+        let auth_service = NullifierAuthenticator::init(oracle.clone(), db);
         let err = auth_service
             .authenticate(&request)
             .await
             .expect_err("Should fail");
         assert_eq!(err.code(), error_codes::REQUESTED_OPRF_REGISTRATION_KEY);
+        assert_eq!(oracle.calls(), vec![]);
         Ok(())
     }
 
@@ -183,12 +192,35 @@ mod tests {
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let id = identifier(&fixture);
         let request = build_request(fixture, OprfKeyId::new(U160::from(2)), id);
-        let auth_service = NullifierAuthenticator::init(Arc::new(TestOracleProxy::accept()), db);
+        let oracle = Arc::new(TestOracleProxy::accept());
+        let auth_service = NullifierAuthenticator::init(oracle.clone(), db);
         let err = auth_service
             .authenticate(&request)
             .await
             .expect_err("Should fail");
         assert_eq!(err.code(), error_codes::UNKNOWN_IDENTIFIER);
+        assert_eq!(oracle.calls(), vec![]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn db_error_test() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let id = identifier(&fixture);
+        db.insert_registration(id, commitment()).await?;
+        db.close_test().await;
+        let request = build_request(fixture, OprfKeyId::new(U160::from(2)), id);
+        let oracle = Arc::new(TestOracleProxy::accept());
+        let auth_service = NullifierAuthenticator::init(oracle.clone(), db);
+        let err = auth_service
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        // a DB failure must not be reported as an unknown identifier
+        assert_eq!(err.code(), error_codes::INTERNAL);
+        assert_eq!(err.message(), "internal");
+        assert_eq!(oracle.calls(), vec![]);
         Ok(())
     }
 

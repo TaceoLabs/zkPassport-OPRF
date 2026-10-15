@@ -7166,6 +7166,8 @@ dependencies = [
 name = "taceo-zkpassport-oprf-node"
 version = "1.0.5"
 dependencies = [
+ "ark-ec",
+ "ark-ff 0.6.0",
  "ark-serialize 0.6.0",
  "axum",
  "backon",

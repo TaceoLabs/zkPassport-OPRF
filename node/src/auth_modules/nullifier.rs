@@ -94,7 +94,6 @@ impl OprfRequestAuthenticator for NullifierAuthenticator {
 mod tests {
     use std::sync::Arc;
 
-    use ark_serialize::{CanonicalDeserialize as _, CanonicalSerialize as _};
     use ruint::aliases::U160;
     use taceo_oprf::{
         core::oprf::BlindingFactor,
@@ -122,19 +121,11 @@ mod tests {
         let point =
             taceo_oprf::core::oprf::client::blind_query(fixture.private_nullifier, blinding_factor)
                 .blinded_query();
-        let mut bytes = Vec::new();
-        point
-            .serialize_uncompressed(&mut bytes)
-            .expect("Can serialize");
-        SaltedIdentifier::deserialize_uncompressed(bytes.as_slice()).expect("Valid point")
+        SaltedIdentifier::from(point)
     }
 
     fn commitment() -> AuthCommitment {
-        let mut bytes = Vec::new();
-        ark_babyjubjub::Fq::from(42u64)
-            .serialize_uncompressed(&mut bytes)
-            .expect("Can serialize");
-        AuthCommitment::deserialize_uncompressed(bytes.as_slice()).expect("Valid field element")
+        AuthCommitment::from(ark_babyjubjub::Fq::from(42u64))
     }
 
     fn build_request(

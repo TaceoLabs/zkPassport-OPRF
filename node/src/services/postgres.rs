@@ -262,7 +262,6 @@ fn is_retryable_error(e: &DbError) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use ark_serialize::{CanonicalDeserialize as _, CanonicalSerialize as _};
     use taceo_nodes_common::postgres::PostgresConfig;
     use taceo_oprf::{core::oprf::BlindingFactor, types::ark_babyjubjub};
     use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier};
@@ -295,19 +294,11 @@ mod tests {
             blinding_factor,
         )
         .blinded_query();
-        let mut bytes = Vec::new();
-        point
-            .serialize_uncompressed(&mut bytes)
-            .expect("Can serialize");
-        SaltedIdentifier::deserialize_uncompressed(bytes.as_slice()).expect("Valid point")
+        SaltedIdentifier::from(point)
     }
 
     fn commitment(n: u64) -> AuthCommitment {
-        let mut bytes = Vec::new();
-        ark_babyjubjub::Fq::from(n)
-            .serialize_uncompressed(&mut bytes)
-            .expect("Can serialize");
-        AuthCommitment::deserialize_uncompressed(bytes.as_slice()).expect("Valid field element")
+        AuthCommitment::from(ark_babyjubjub::Fq::from(n))
     }
 
     /// All commitments in the history of `id`, sorted.

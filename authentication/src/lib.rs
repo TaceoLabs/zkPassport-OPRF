@@ -68,6 +68,33 @@ pub struct SaltedIdentifier(
 )]
 pub struct AuthCommitment(#[serde(with = "ark_serde_compat::field")] ark_babyjubjub::Fq);
 
+impl From<ark_babyjubjub::EdwardsAffine> for SaltedIdentifier {
+    fn from(value: ark_babyjubjub::EdwardsAffine) -> Self {
+        Self(value)
+    }
+}
+
+impl From<ark_babyjubjub::Fq> for AuthCommitment {
+    fn from(value: ark_babyjubjub::Fq) -> Self {
+        Self(value)
+    }
+}
+
+impl SaltedIdentifier {
+    /// Returns the wrapped `Affine` point.
+    pub fn inner(self) -> ark_babyjubjub::EdwardsAffine {
+        self.0
+    }
+}
+
+impl AuthCommitment {
+    /// Returns the wrapped field element.
+    #[must_use]
+    pub fn inner(self) -> ark_babyjubjub::Fq {
+        self.0
+    }
+}
+
 /// Request when sending a rotation request.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CommitmentRotationRequest {

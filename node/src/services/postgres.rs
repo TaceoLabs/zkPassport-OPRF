@@ -176,7 +176,7 @@ impl ZkPassportDb {
                 return Ok(());
             }
             let inserted = sqlx::query(
-                "INSERT INTO commitment_history (salted_identifier, commitment) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+                "INSERT INTO commitment_history (salted_identifier, commitment) VALUES ($1, $2) ON CONFLICT (salted_identifier, commitment) DO NOTHING",
             )
             .bind(identifier.as_slice())
             .bind(commitment.as_slice())
@@ -219,13 +219,12 @@ impl ZkPassportDb {
             .transpose()
             .map_err(DbError::from)
         })
-        .await
-        .context("while fetching commitment")?
-        .ok_or_else(|| DbError::UnknownIdentifier)
+        .await?
+        .ok_or(DbError::UnknownIdentifier)
     }
 
     /// Runs `f`, retrying it on transient [`DbError::Db`] errors. Domain errors are never retried.
-    pub(crate) async fn with_retry<F, Fut, T>(&self, op_name: &str, f: F) -> Result<T, DbError>
+    async fn with_retry<F, Fut, T>(&self, op_name: &str, f: F) -> Result<T, DbError>
     where
         F: Fn() -> Fut,
         Fut: Future<Output = Result<T, DbError>>,
@@ -262,20 +261,228 @@ fn is_retryable_error(e: &DbError) -> bool {
 }
 
 #[cfg(test)]
-impl ZkPassportDb {
-    /// Connects to the shared Postgres test container using a fresh schema.
-    ///
-    /// Keep the returned handle alive as long as the DB is used.
-    pub(crate) async fn init_test() -> eyre::Result<(
-        std::sync::Arc<taceo_nodes_common::test_utils::SharedPostgres>,
-        Self,
-    )> {
-        let postgres = taceo_nodes_common::test_utils::shared_postgres_testcontainer().await?;
-        let config = PostgresConfig::with_default_values(
-            postgres.connection_string.clone().into(),
-            taceo_nodes_common::test_utils::next_test_schema(),
-        );
-        let db = Self::init(&config).await?;
-        Ok((postgres, db))
+mod tests {
+    use ark_serialize::{CanonicalDeserialize as _, CanonicalSerialize as _};
+    use taceo_nodes_common::postgres::PostgresConfig;
+    use taceo_oprf::{core::oprf::BlindingFactor, types::ark_babyjubjub};
+    use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier};
+
+    use super::{DbError, ZkPassportDb, is_retryable_error};
+
+    impl ZkPassportDb {
+        /// Connects to the shared Postgres test container using a fresh schema.
+        ///
+        /// Keep the returned handle alive as long as the DB is used.
+        pub(crate) async fn init_test() -> eyre::Result<(
+            std::sync::Arc<taceo_nodes_common::test_utils::SharedPostgres>,
+            Self,
+        )> {
+            let postgres = taceo_nodes_common::test_utils::shared_postgres_testcontainer().await?;
+            let config = PostgresConfig::with_default_values(
+                postgres.connection_string.clone().into(),
+                taceo_nodes_common::test_utils::next_test_schema(),
+            );
+            let db = Self::init(&config).await?;
+            Ok((postgres, db))
+        }
+    }
+
+    fn identifier(n: u64) -> SaltedIdentifier {
+        let blinding_factor = BlindingFactor::from_scalar(ark_babyjubjub::Fr::from(7u64))
+            .expect("Invalid blinding factor");
+        let point = taceo_oprf::core::oprf::client::blind_query(
+            ark_babyjubjub::Fq::from(n),
+            blinding_factor,
+        )
+        .blinded_query();
+        let mut bytes = Vec::new();
+        point
+            .serialize_uncompressed(&mut bytes)
+            .expect("Can serialize");
+        SaltedIdentifier::deserialize_uncompressed(bytes.as_slice()).expect("Valid point")
+    }
+
+    fn commitment(n: u64) -> AuthCommitment {
+        let mut bytes = Vec::new();
+        ark_babyjubjub::Fq::from(n)
+            .serialize_uncompressed(&mut bytes)
+            .expect("Can serialize");
+        AuthCommitment::deserialize_uncompressed(bytes.as_slice()).expect("Valid field element")
+    }
+
+    /// All commitments in the history of `id`, sorted.
+    async fn history(db: &ZkPassportDb, id: SaltedIdentifier) -> Vec<AuthCommitment> {
+        let id = taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&id);
+        let rows: Vec<Vec<u8>> = sqlx::query_scalar(
+            "SELECT commitment FROM commitment_history WHERE salted_identifier = $1 ORDER BY commitment",
+        )
+        .bind(id.as_slice())
+        .fetch_all(&db.pool)
+        .await
+        .expect("history query");
+        rows.into_iter()
+            .map(|b| {
+                taceo_nodes_common::postgres::from_db_ark_serialize_uncompressed(b)
+                    .expect("valid commitment")
+            })
+            .collect()
+    }
+
+    fn sorted(mut v: Vec<AuthCommitment>) -> Vec<AuthCommitment> {
+        let key = |c: &AuthCommitment| {
+            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(c).to_vec()
+        };
+        v.sort_by_key(key);
+        v
+    }
+
+    #[tokio::test]
+    async fn register_and_fetch() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let (id, c1) = (identifier(1), commitment(1));
+        db.insert_registration(id, c1).await?;
+        assert_eq!(db.fetch_commitment(id).await?, c1);
+        assert_eq!(history(&db, id).await, vec![c1]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn fetch_unknown() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let err = db
+            .fetch_commitment(identifier(1))
+            .await
+            .expect_err("should fail");
+        assert!(matches!(err, DbError::UnknownIdentifier));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn register_same_commitment_is_idempotent() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let (id, c1) = (identifier(1), commitment(1));
+        db.insert_registration(id, c1).await?;
+        db.insert_registration(id, c1).await?;
+        assert_eq!(history(&db, id).await, vec![c1]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn register_other_commitment_rejected() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let (id, c1) = (identifier(1), commitment(1));
+        db.insert_registration(id, c1).await?;
+        let err = db
+            .insert_registration(id, commitment(2))
+            .await
+            .expect_err("should fail");
+        assert!(matches!(err, DbError::AlreadyRegistered));
+        assert_eq!(db.fetch_commitment(id).await?, c1);
+        assert_eq!(history(&db, id).await, vec![c1]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rotate_unknown() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let id = identifier(1);
+        let err = db
+            .rotate_commitment(id, commitment(1))
+            .await
+            .expect_err("should fail");
+        assert!(matches!(err, DbError::UnknownIdentifier));
+        assert_eq!(history(&db, id).await.len(), 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rotate_updates_current_and_history() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let (id, c1, c2) = (identifier(1), commitment(1), commitment(2));
+        db.insert_registration(id, c1).await?;
+        db.rotate_commitment(id, c2).await?;
+        assert_eq!(db.fetch_commitment(id).await?, c2);
+        assert_eq!(history(&db, id).await, sorted(vec![c1, c2]));
+        // rotating to the current commitment is a no-op
+        db.rotate_commitment(id, c2).await?;
+        assert_eq!(history(&db, id).await, sorted(vec![c1, c2]));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rotate_to_previous_commitment_rejected() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let (id, c1, c2) = (identifier(1), commitment(1), commitment(2));
+        db.insert_registration(id, c1).await?;
+        db.rotate_commitment(id, c2).await?;
+        let err = db.rotate_commitment(id, c1).await.expect_err("should fail");
+        assert!(matches!(err, DbError::CommitmentPreviouslyUsed));
+        assert_eq!(db.fetch_commitment(id).await?, c2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn commitment_reuse_across_identifiers_allowed() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let (a, b, c1, c2) = (identifier(1), identifier(2), commitment(1), commitment(2));
+        db.insert_registration(a, c1).await?;
+        db.insert_registration(b, c1).await?;
+        db.rotate_commitment(a, c2).await?;
+        db.rotate_commitment(b, c2).await?;
+        assert_eq!(db.fetch_commitment(a).await?, c2);
+        assert_eq!(db.fetch_commitment(b).await?, c2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn concurrent_registrations_store_exactly_one() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let id = identifier(1);
+        let handles: Vec<_> = (1..=8u64)
+            .map(|n| {
+                let db = db.clone();
+                tokio::spawn(async move { db.insert_registration(id, commitment(n)).await })
+            })
+            .collect();
+        let mut ok = 0;
+        for h in handles {
+            match h.await? {
+                Ok(()) => ok += 1,
+                Err(e) => assert!(matches!(e, DbError::AlreadyRegistered)),
+            }
+        }
+        assert_eq!(ok, 1);
+        let winner = db.fetch_commitment(id).await?;
+        assert_eq!(history(&db, id).await, vec![winner]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn concurrent_rotations_are_serialized() -> eyre::Result<()> {
+        let (_pg, db) = ZkPassportDb::init_test().await?;
+        let id = identifier(1);
+        db.insert_registration(id, commitment(0)).await?;
+        let handles: Vec<_> = (1..=8u64)
+            .map(|n| {
+                let db = db.clone();
+                tokio::spawn(async move { db.rotate_commitment(id, commitment(n)).await })
+            })
+            .collect();
+        for h in handles {
+            h.await??;
+        }
+        let all: Vec<_> = (0..=8u64).map(commitment).collect();
+        assert_eq!(history(&db, id).await, sorted(all.clone()));
+        assert!(all.contains(&db.fetch_commitment(id).await?));
+        Ok(())
+    }
+
+    #[test]
+    fn retryable_errors() {
+        assert!(is_retryable_error(&DbError::Db(sqlx::Error::PoolTimedOut)));
+        assert!(!is_retryable_error(&DbError::Db(sqlx::Error::RowNotFound)));
+        assert!(!is_retryable_error(&DbError::UnknownIdentifier));
+        assert!(!is_retryable_error(&DbError::AlreadyRegistered));
+        assert!(!is_retryable_error(&DbError::CommitmentPreviouslyUsed));
     }
 }

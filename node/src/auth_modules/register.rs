@@ -65,7 +65,7 @@ mod tests {
 
     use crate::{
         auth_modules::register::RegisterAuthenticator,
-        services::oracle_proxy::test::TestOracleProxy,
+        services::oracle_proxy::test::{OracleCall, TestOracleProxy},
     };
 
     // TODO: once `OracleProxy::salted_identifier` sends requests to the proof-verifier, add
@@ -88,9 +88,11 @@ mod tests {
     async fn success_test() -> eyre::Result<()> {
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);
-        let auth_service = RegisterAuthenticator::init(Arc::new(TestOracleProxy::accept()));
+        let oracle = Arc::new(TestOracleProxy::accept());
+        let auth_service = RegisterAuthenticator::init(oracle.clone());
         let oprf_key = auth_service.authenticate(&request).await?;
         assert_eq!(oprf_key, registration_oprf_key_id());
+        assert_eq!(oracle.calls(), vec![OracleCall::SaltedIdentifier]);
         Ok(())
     }
 

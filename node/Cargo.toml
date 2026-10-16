@@ -49,9 +49,11 @@ zeroize = { workspace = true }
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
 
 [dev-dependencies]
+ark-ec.workspace = true
+ark-ff.workspace = true
 ruint.workspace = true
-taceo-nodes-common = { workspace = true, features = ["postgres", "test-utils"] }
-taceo-oprf = { workspace = true, features = ["core", "postgres", "service"] }
+taceo-nodes-common = { workspace = true, features = ["axum-test", "postgres"] }
+taceo-oprf = { workspace = true, features = ["client", "core", "postgres", "service"] }
 uuid = { workspace = true, features = ["serde", "v4"] }
 zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1", features = ["containers"] }
 

@@ -22,10 +22,12 @@ type Result<T> = std::result::Result<T, OracleError>;
 /// Dynamic trait object for the oracle proxy.
 ///
 /// Must be `Send + Sync` to work with async contexts (e.g., Axum).
-pub(crate) type OracleProxyService = Arc<dyn OracleProxy + Send + Sync>;
+pub type OracleProxyService = Arc<dyn OracleProxy + Send + Sync>;
 
+/// Errors returned by an [`OracleProxy`].
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum OracleError {
+#[non_exhaustive]
+pub enum OracleError {
     /// Cannot reach oracle
     #[error(transparent)]
     OracleNotReachable(#[from] reqwest::Error),
@@ -34,7 +36,12 @@ pub(crate) enum OracleError {
     BadRequest(String),
     /// Oracle returned a non-success HTTP status
     #[error("Unexpected status code: {status} with body: {body}")]
-    UnexpectedStatusCode { status: StatusCode, body: String },
+    UnexpectedStatusCode {
+        /// The returned status code.
+        status: StatusCode,
+        /// The response body.
+        body: String,
+    },
     /// Serde
     #[error(transparent)]
     InvalidMessage(#[from] serde_json::Error),
@@ -125,17 +132,17 @@ impl From<OracleError> for AuthErrorKind {
 /// - Unblinding the response with `r` yields `I`.
 ///
 /// A user obtains its inputs (`r`, the response and `pi`) after the first registration step (see
-/// [`RegisterAuthenticator`](crate::auth_modules::register::RegisterAuthenticator)) and stacks it
+/// `RegisterAuthenticator`) and stacks it
 /// on the base proof in later requests. Its public inputs are fixed for a cached `P`, so a user
 /// MAY cache the identifier proof alongside the base proof. The cache is invalidated when either
 /// `P` or the public key of `k_reg` changes.
 #[async_trait]
-pub(crate) trait OracleProxy {
+pub trait OracleProxy {
     /// Verifies that a user is eligible to obtain the
     /// [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier) `I` for the passport
     /// committed in `P`. First step of the registration process.
     ///
-    /// Consumed by [`RegisterAuthenticator`](crate::auth_modules::register::RegisterAuthenticator),
+    /// Consumed by `RegisterAuthenticator`,
     /// which then evaluates the OPRF under `k_reg`.
     ///
     /// # Proof Composition
@@ -199,7 +206,7 @@ pub(crate) trait OracleProxy {
     /// Verifies that the user may request a salted nullifier, an opaque per-customer identifier
     /// that provides sybil resistance within the zkPassport ecosystem.
     ///
-    /// Consumed by [`NullifierAuthenticator`](crate::auth_modules::nullifier::NullifierAuthenticator),
+    /// Consumed by `NullifierAuthenticator`,
     /// which then evaluates the OPRF on `B` under `k_c`.
     ///
     /// # Proof Composition

@@ -15,7 +15,9 @@ use taceo_oprf::{
     service::secret_manager::{SecretManager, postgres::PostgresSecretManager},
     types::service::NodeInformation,
 };
-use taceo_zkpassport_oprf_node::{ZkPassportDb, config::ZkPassportNodeConfig};
+use taceo_zkpassport_oprf_node::{
+    OracleProxyService, ProofVerifierOracle, ZkPassportDb, config::ZkPassportNodeConfig,
+};
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
 use tower_http::catch_panic::CatchPanicLayer;
@@ -148,14 +150,30 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
 
     tracing::info!("loaded node-information: {node_information:#?}");
 
+    let node_config = config.node_config;
+    let oracle_client = reqwest::ClientBuilder::new()
+        .timeout(node_config.oracle_request_timeout)
+        .build()
+        .context("while building reqwest client")?;
+    let oracle_proxy: OracleProxyService = Arc::new(
+        ProofVerifierOracle::init(
+            oracle_client,
+            node_config.oracle_base_url,
+            node_config.node_config.environment,
+            node_config.oracle_retry_layer,
+        )
+        .context("while building oracle proxy")?,
+    );
+
     tracing::info!("starting zkPassport service...");
     let oprf_service_router = taceo_zkpassport_oprf_node::start(
-        config.node_config,
+        node_config.node_config,
+        oracle_proxy,
         secret_manager,
         zkpassport_db,
         &node_information,
         taceo_nodes_common::version_info!(),
-    )?
+    )
     .layer(CatchPanicLayer::new());
 
     tracing::info!("starting axum server");

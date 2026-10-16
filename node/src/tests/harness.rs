@@ -5,6 +5,7 @@ use ark_ff::Field as _;
 use reqwest::StatusCode;
 use ruint::aliases::U160;
 use serde::Serialize;
+use taceo_nodes_common::test_utils::{axum_test::TestServer, test_server};
 use taceo_oprf::{
     client::{Connector, Error, ServiceError, VerifiableOprfOutput},
     core::{ddlog_equality::shamir::DLogShareShamir, oprf::BlindingFactor},
@@ -102,6 +103,8 @@ fn share_key(secret: Fr) -> Vec<OprfKeyMaterial> {
 /// Three in-process OPRF nodes holding shares of the registration and the customer key.
 pub(crate) struct TestNodes {
     urls: Vec<String>,
+    /// Keeps the nodes running.
+    _servers: Vec<TestServer>,
     /// Shared by all nodes, so it records the calls of every node.
     pub(crate) oracle: TestOracleProxy,
     /// The database of each node, to check state the HTTP API does not expose.
@@ -118,6 +121,7 @@ impl TestNodes {
         ];
         let pg = taceo_nodes_common::test_utils::shared_postgres_testcontainer().await?;
         let mut urls = Vec::with_capacity(NUM_NODES);
+        let mut servers = Vec::with_capacity(NUM_NODES);
         let mut dbs = Vec::with_capacity(NUM_NODES);
         for party_id in 0..NUM_NODES {
             // a fresh schema in the shared container
@@ -135,7 +139,7 @@ impl TestNodes {
                     .map(|(id, shares)| (*id, shares[party_id].clone()))
                     .collect(),
             });
-            let router = crate::router(
+            let router = crate::start(
                 OprfNodeServiceConfig::with_default_values(
                     Environment::Dev,
                     taceo_oprf::client::VERSION.parse()?,
@@ -146,12 +150,13 @@ impl TestNodes {
                 &node_information,
                 "test".to_owned(),
             );
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-            urls.push(format!("http://{}", listener.local_addr()?));
-            tokio::spawn(axum::serve(listener, router).into_future());
+            let (server, url) = test_server(router);
+            servers.push(server);
+            urls.push(url);
         }
         Ok(Self {
             urls,
+            _servers: servers,
             oracle,
             dbs,
             http: reqwest::Client::new(),

@@ -2,8 +2,8 @@
 //!
 //! This crate provides the [`start`] function, which:
 //!
-//! 1. Initializes the `FaceMatchAuthenticator` and the `RegisterAuthenticator`
-//!    that verify zkPassport proofs through an oracle.
+//! 1. Initializes the authentication modules, which verify zkPassport proofs
+//!    through the given [`OracleProxy`].
 //! 2. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
 //!    and registers the face-match and register authentication modules.
 //! 3. Nests the HTTP API (`/api`, e.g. commitment rotation backed by the
@@ -14,7 +14,6 @@
 use std::sync::Arc;
 
 use axum::Router;
-use eyre::Context;
 use taceo_oprf::{
     service::{
         StartedServices, config::OprfNodeServiceConfig, secret_manager::SecretManagerService,
@@ -23,13 +22,9 @@ use taceo_oprf::{
 };
 use zkpassport_oprf_authentication::AuthModules;
 
-use crate::{
-    auth_modules::{
-        face_match::FaceMatchAuthenticator, nullifier::NullifierAuthenticator,
-        register::RegisterAuthenticator,
-    },
-    config::ZkPassportNodeConfig,
-    services::oracle_proxy::{OracleProxyService, proof_verifier::ProofVerifierOracle},
+use crate::auth_modules::{
+    face_match::FaceMatchAuthenticator, nullifier::NullifierAuthenticator,
+    register::RegisterAuthenticator,
 };
 
 pub(crate) mod api;
@@ -40,12 +35,18 @@ pub(crate) mod services;
 #[cfg(test)]
 mod tests;
 
-pub use services::postgres::ZkPassportDb;
+pub use services::{
+    oracle_proxy::{
+        OracleError, OracleProxy, OracleProxyService, proof_verifier::ProofVerifierOracle,
+    },
+    postgres::ZkPassportDb,
+};
 
 /// Initialize and wire the zkPassport OPRF service.
 ///
 /// # Parameters
-/// - `config` — node configuration (oracle URLs, OPRF service config)
+/// - `node_config` — OPRF service config
+/// - `oracle_proxy` — oracle that verifies zkPassport proofs, see [`ProofVerifierOracle`]
 /// - `secret_manager` — back-end for loading and storing OPRF key shares
 /// - `zkpassport_db` — initialized users database, with migrations applied at startup
 /// - `node_information` — identity and peer information for the OPRF service
@@ -53,44 +54,7 @@ pub use services::postgres::ZkPassportDb;
 ///
 /// # Returns
 /// The Axum [`Router`] to be served by the HTTP listener.
-///
-/// # Errors
-/// Returns an error if the oracle client cannot be initialized.
 pub fn start(
-    config: ZkPassportNodeConfig,
-    secret_manager: SecretManagerService,
-    zkpassport_db: ZkPassportDb,
-    node_information: &NodeInformation,
-    version_str: String,
-) -> eyre::Result<axum::Router> {
-    // we use the client-builder to avoid panic if we cannot install tls backend
-    let oracle_client = reqwest::ClientBuilder::new()
-        .timeout(config.oracle_request_timeout)
-        .build()
-        .context("while building reqwest client")?;
-
-    tracing::info!("init oprf request auth service..");
-    let oracle_proxy: OracleProxyService = Arc::new(
-        ProofVerifierOracle::init(
-            oracle_client,
-            config.oracle_base_url,
-            config.node_config.environment,
-            config.oracle_retry_layer,
-        )
-        .context("while building oracle proxy")?,
-    );
-    Ok(router(
-        config.node_config,
-        oracle_proxy,
-        secret_manager,
-        zkpassport_db,
-        node_information,
-        version_str,
-    ))
-}
-
-/// Wires the authentication modules and the HTTP API around `oracle_proxy`.
-fn router(
     node_config: OprfNodeServiceConfig,
     oracle_proxy: OracleProxyService,
     secret_manager: SecretManagerService,

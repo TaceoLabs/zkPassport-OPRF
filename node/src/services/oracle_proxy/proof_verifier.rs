@@ -75,14 +75,18 @@ impl OracleEndpoints {
 
 /// [`OracleProxy`] backed by the zkPassport proof-verifier, with shared retry policy.
 #[derive(Debug, Clone)]
-pub(crate) struct ProofVerifierOracle {
+pub struct ProofVerifierOracle {
     client: reqwest::Client,
     endpoints: OracleEndpoints,
     backoff: ExponentialBuilder,
 }
 
 impl ProofVerifierOracle {
-    pub(crate) fn init(
+    /// Creates an oracle that sends its requests with `client` to the endpoints below `base_url`.
+    ///
+    /// # Errors
+    /// Returns an error if the endpoint URLs cannot be derived from `base_url`.
+    pub fn init(
         client: reqwest::Client,
         base_url: Url,
         environment: Environment,
@@ -269,22 +273,32 @@ mod tests {
 
     use axum::{Json, Router, http::StatusCode as AxumStatus, routing::post};
     use serde_json::json;
+    use taceo_nodes_common::test_utils::{axum_test::TestServer, test_server};
 
     use super::*;
 
     /// Serves `app` and returns a [`ProofVerifierOracle`] pointing at it.
-    async fn serve(app: Router, retry: RetryLayerConfig) -> eyre::Result<ProofVerifierOracle> {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let url = format!("http://{}", listener.local_addr()?).parse()?;
-        tokio::spawn(async move { axum::serve(listener, app).await });
-        ProofVerifierOracle::init(reqwest::Client::new(), url, Environment::Test, retry)
+    ///
+    /// The server stops when the returned [`TestServer`] is dropped.
+    fn serve(
+        app: Router,
+        retry: RetryLayerConfig,
+    ) -> eyre::Result<(TestServer, ProofVerifierOracle)> {
+        let (server, url) = test_server(app);
+        let oracle = ProofVerifierOracle::init(
+            reqwest::Client::new(),
+            url.parse()?,
+            Environment::Test,
+            retry,
+        )?;
+        Ok((server, oracle))
     }
 
     /// Serves a mock oracle answering the face-match endpoint with `status` and `body`.
-    async fn mock_oracle(
+    fn mock_oracle(
         status: AxumStatus,
         body: serde_json::Value,
-    ) -> eyre::Result<ProofVerifierOracle> {
+    ) -> eyre::Result<(TestServer, ProofVerifierOracle)> {
         let app = Router::new().route(
             &format!("/{FACE_MATCH_PATH}"),
             post(move || {
@@ -292,7 +306,7 @@ mod tests {
                 async move { (status, Json(body)) }
             }),
         );
-        serve(app, RetryLayerConfig::disabled()).await
+        serve(app, RetryLayerConfig::disabled())
     }
 
     async fn face_match(oracle: &ProofVerifierOracle) -> Result<()> {
@@ -307,18 +321,17 @@ mod tests {
 
     #[tokio::test]
     async fn face_match_ok_test() -> eyre::Result<()> {
-        let oracle = mock_oracle(AxumStatus::OK, json!({ "verified": true })).await?;
+        let (_server, oracle) = mock_oracle(AxumStatus::OK, json!({ "verified": true }))?;
         face_match(&oracle).await?;
         Ok(())
     }
 
     #[tokio::test]
     async fn face_match_bad_request_test() -> eyre::Result<()> {
-        let oracle = mock_oracle(
+        let (_server, oracle) = mock_oracle(
             AxumStatus::BAD_REQUEST,
             json!({ "verified": false, "error": "invalid proof" }),
-        )
-        .await?;
+        )?;
         let err = face_match(&oracle).await.expect_err("Should fail");
         assert!(matches!(err, OracleError::BadRequest(msg) if msg == "invalid proof"));
         Ok(())
@@ -326,7 +339,7 @@ mod tests {
 
     #[tokio::test]
     async fn face_match_bad_request_without_reason_test() -> eyre::Result<()> {
-        let oracle = mock_oracle(AxumStatus::BAD_REQUEST, json!({ "verified": false })).await?;
+        let (_server, oracle) = mock_oracle(AxumStatus::BAD_REQUEST, json!({ "verified": false }))?;
         let err = face_match(&oracle).await.expect_err("Should fail");
         assert!(matches!(err, OracleError::BadRequest(msg) if msg == "unknown"));
 
@@ -334,7 +347,7 @@ mod tests {
             &format!("/{FACE_MATCH_PATH}"),
             post(|| async { (AxumStatus::BAD_REQUEST, "not json") }),
         );
-        let oracle = serve(app, RetryLayerConfig::disabled()).await?;
+        let (_server, oracle) = serve(app, RetryLayerConfig::disabled())?;
         let err = face_match(&oracle).await.expect_err("Should fail");
         assert!(matches!(err, OracleError::BadRequest(msg) if msg == "unknown"));
         Ok(())
@@ -342,11 +355,10 @@ mod tests {
 
     #[tokio::test]
     async fn face_match_unexpected_status_test() -> eyre::Result<()> {
-        let oracle = mock_oracle(
+        let (_server, oracle) = mock_oracle(
             AxumStatus::INTERNAL_SERVER_ERROR,
             json!({ "error": "boom" }),
-        )
-        .await?;
+        )?;
         let err = face_match(&oracle).await.expect_err("Should fail");
         assert!(matches!(
             err,
@@ -380,7 +392,7 @@ mod tests {
                 (AxumStatus::OK, Json(json!({ "verified": true })))
             }),
         );
-        let oracle = serve(app, RetryLayerConfig::disabled()).await?;
+        let (_server, oracle) = serve(app, RetryLayerConfig::disabled())?;
         face_match(&oracle).await?;
         let body = rx.recv().await.expect("oracle received a request");
         // the expected values were produced by zkPassport, not by our serialization
@@ -416,7 +428,7 @@ mod tests {
             verifier_request_max_delay: Duration::from_millis(1),
             verifier_request_max_attempts: 1,
         };
-        let oracle = serve(app, retry).await?;
+        let (_server, oracle) = serve(app, retry)?;
         face_match(&oracle).await?;
         assert_eq!(calls.load(Ordering::SeqCst), 2);
         Ok(())

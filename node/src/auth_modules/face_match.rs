@@ -63,7 +63,10 @@ mod tests {
     use crate::{
         auth_modules::face_match::FaceMatchAuthenticator,
         config::RetryLayerConfig,
-        services::oracle_proxy::{proof_verifier::ProofVerifierOracle, test::TestOracleProxy},
+        services::oracle_proxy::{
+            proof_verifier::ProofVerifierOracle,
+            test::{OracleCall, TestOracleProxy},
+        },
     };
 
     fn build_request(fixture: FixtureData) -> OprfRequest<FaceMatchRequestAuth> {
@@ -82,9 +85,18 @@ mod tests {
     async fn success_test() -> eyre::Result<()> {
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);
-        let auth_service = FaceMatchAuthenticator::init(Arc::new(TestOracleProxy::accept()));
+        let oracle = Arc::new(TestOracleProxy::accept());
+        let auth_service = FaceMatchAuthenticator::init(oracle.clone());
         let oprf_key = auth_service.authenticate(&request).await?;
         assert_eq!(oprf_key.into_inner(), 1);
+        // the oracle verifies the proofs against the blinded query of this request
+        assert_eq!(
+            oracle.calls(),
+            vec![OracleCall::V1FaceMatch {
+                blinded_query: request.blinded_query,
+                proofs: request.auth.proofs.clone(),
+            }]
+        );
         Ok(())
     }
 

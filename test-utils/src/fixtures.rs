@@ -26,16 +26,23 @@ fn hex_to_bytes(hex: &str) -> Vec<u8> {
         .collect()
 }
 
-/// Load ZKPassport proofs, privateNullifier, and beta from the fixtures file.
-pub fn load_fixture_data() -> FixtureData {
+/// Load the fixtures file as raw JSON, as produced by zkPassport.
+///
+/// Besides the fields read by [`load_fixture_data`], it contains the
+/// `blinded_unique_identifier` computed by zkPassport from `privateNullifier` and `beta`.
+pub fn load_fixture_json() -> serde_json::Value {
     let fixture_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/fixtures/zkpassport-proofs.json"
     );
     let data = std::fs::read_to_string(fixture_path)
         .unwrap_or_else(|e| panic!("Failed to read fixture file {fixture_path}: {e}"));
-    let value: serde_json::Value =
-        serde_json::from_str(&data).expect("Failed to parse fixture JSON");
+    serde_json::from_str(&data).expect("Failed to parse fixture JSON")
+}
+
+/// Load ZKPassport proofs, privateNullifier, and beta from the fixtures file.
+pub fn load_fixture_data() -> FixtureData {
+    let value = load_fixture_json();
 
     let proofs: Vec<ZKPassportProofResult> =
         serde_json::from_value(value["proofs"].clone()).expect("Failed to parse proofs");

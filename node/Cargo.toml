@@ -1,6 +1,6 @@
 [package]
 name = "taceo-zkpassport-oprf-node"
-version = "1.0.5"
+version = "2.0.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "Backend server for zkPassport instance of TACEO:OPRF"
@@ -46,7 +46,7 @@ tower-http = { workspace = true, features = ["catch-panic"] }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
 url = { workspace = true, features = ["serde"] }
 zeroize = { workspace = true }
-zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
+zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.2" }
 
 [dev-dependencies]
 ark-ec.workspace = true
@@ -55,7 +55,7 @@ ruint.workspace = true
 taceo-nodes-common = { workspace = true, features = ["axum-test", "postgres"] }
 taceo-oprf = { workspace = true, features = ["client", "core", "postgres", "service"] }
 uuid = { workspace = true, features = ["serde", "v4"] }
-zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1", features = ["containers"] }
+zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.2", features = ["containers"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator.workspace = true

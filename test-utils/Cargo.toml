@@ -1,6 +1,6 @@
 [package]
 name = "taceo-zkpassport-oprf-test-utils"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "Shared test fixtures and container harness for zkPassport OPRF."
@@ -15,7 +15,7 @@ publish.workspace = true
 ark-babyjubjub.workspace = true
 ark-ff.workspace = true
 serde_json.workspace = true
-zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
+zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.2" }
 
 # container harness (feature-gated)
 testcontainers = { workspace = true, optional = true }

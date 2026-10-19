@@ -7255,7 +7255,7 @@ dependencies = [
 
 [[package]]
 name = "taceo-zkpassport-dev-client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "alloy",
  "clap",
@@ -7274,7 +7274,7 @@ dependencies = [
 
 [[package]]
 name = "taceo-zkpassport-oprf-authentication"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ark-serialize 0.6.0",
  "ruint",
@@ -7287,7 +7287,7 @@ dependencies = [
 
 [[package]]
 name = "taceo-zkpassport-oprf-client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ark-ff 0.6.0",
  "eyre",
@@ -7298,7 +7298,7 @@ dependencies = [
 
 [[package]]
 name = "taceo-zkpassport-oprf-node"
-version = "1.0.5"
+version = "2.0.0"
 dependencies = [
  "ark-ec",
  "ark-ff 0.6.0",
@@ -7333,7 +7333,7 @@ dependencies = [
 
 [[package]]
 name = "taceo-zkpassport-oprf-test-utils"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ark-ff 0.6.0",
  "reqwest",

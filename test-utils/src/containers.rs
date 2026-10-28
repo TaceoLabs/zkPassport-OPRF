@@ -14,7 +14,7 @@ use tokio::sync::Mutex;
 
 const PROOF_VERIFIER_IMAGE: &str =
     "europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier";
-const PROOF_VERIFIER_TAG: &str = "9315823d2663ed1be6570765e44eb64fadcdb9bc";
+const PROOF_VERIFIER_TAG: &str = "61c485465a41aa372adecf22587af7257ec7bde6";
 const PROOF_VERIFIER_INTERNAL_PORT: u16 = 8080;
 
 /// Handle to the process-wide shared proof-verifier container.

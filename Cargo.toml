@@ -39,13 +39,10 @@ testcontainers = { version = "0.27", features = ["http_wait_plain"] }
 thiserror = { version = "2" }
 tikv-jemallocator = "0.7"
 tokio = { version = "1" }
-tokio-util = "0.7"
 tower-http = { version = "0.7", default-features = false }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3" }
-url = { version = "2", default-features = false }
 uuid = { version = "1" }
-zeroize = "1"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

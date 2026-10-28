@@ -1,6 +1,6 @@
 services:
   proof-verifier:
-    image: ${PROOF_VERIFIER_IMAGE:-europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier:9315823d2663ed1be6570765e44eb64fadcdb9bc}
+    image: ${PROOF_VERIFIER_IMAGE:-europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier:61c485465a41aa372adecf22587af7257ec7bde6}
     container_name: proof-verifier
     ports:
       - "8080:8080"

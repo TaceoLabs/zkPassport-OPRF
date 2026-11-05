@@ -1,6 +1,6 @@
 [package]
 name = "taceo-zkpassport-dev-client"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "Dev-Client for zkPassport instance of TACEO:OPRF. Used for testing."
@@ -37,6 +37,6 @@ tracing-subscriber = { workspace = true, features = [
   "fmt",
 ] }
 uuid = { workspace = true, features = ["serde", "v4"] }
-zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
-zkpassport-oprf-client = { package = "taceo-zkpassport-oprf-client", path = "../client", version = "0.1" }
-zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1" }
+zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.2" }
+zkpassport-oprf-client = { package = "taceo-zkpassport-oprf-client", path = "../client", version = "0.2" }
+zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.2" }

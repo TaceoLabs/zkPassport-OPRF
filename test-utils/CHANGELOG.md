@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.0](https://github.com/TaceoLabs/zkPassport-OPRF/compare/taceo-zkpassport-oprf-test-utils-v0.1.0...taceo-zkpassport-oprf-test-utils-v0.2.0)
+
+### ⛰️ Features
+
+
+- *(node)* Added axum routes for non-oprf calls and some new-types - ([a0eed03](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a0eed037eab53fb3b38e9f020fd342be9714654b))
+- *(node)* Adds stubs for the proxy - ([d531423](https://github.com/TaceoLabs/zkPassport-OPRF/commit/d531423158fa585a3f99a470e40800bce2d4bff8))
+
+### 🚜 Refactor
+
+
+- *(node)* [**breaking**] Remove health check service - ([c71dd4a](https://github.com/TaceoLabs/zkPassport-OPRF/commit/c71dd4accf2a10759132f7ecea04658ad404a1e9))
+- *(node)* Add v2 service and move face-match to v1. Adds an oracle proxy - ([284b746](https://github.com/TaceoLabs/zkPassport-OPRF/commit/284b7466fcdbf696c2e8d3d93c2768da65fe0abc))
+
+### 🧪 Testing
+
+
+- Add unit tests and integration test suite ([#206](https://github.com/TaceoLabs/zkPassport-OPRF/pull/206)) - ([45e4666](https://github.com/TaceoLabs/zkPassport-OPRF/commit/45e4666efe90bce98a71c595513c85677129d99c))
+- Remove proof-verifier testcontainer after the last test - ([387d38a](https://github.com/TaceoLabs/zkPassport-OPRF/commit/387d38a5f6eb57aadcd5ba69165cc85c81b1cf96))
+
+### 🌀 Other
+
+
+- Update verifier tag ([#199](https://github.com/TaceoLabs/zkPassport-OPRF/pull/199)) - ([d7c53f1](https://github.com/TaceoLabs/zkPassport-OPRF/commit/d7c53f1c9de75fbef86e9b87f3f7c78e989dc6fb))
+
+
 ## [0.1.0]
 
 ### ⛰️ Features

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/TaceoLabs/zkPassport-OPRF/compare/taceo-zkpassport-dev-client-v0.1.0...taceo-zkpassport-dev-client-v0.2.0)
+
+### ⛰️ Features
+
+
+- *(node)* Added axum routes for non-oprf calls and some new-types - ([a0eed03](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a0eed037eab53fb3b38e9f020fd342be9714654b))
+- *(node)* Adds stubs for the proxy - ([d531423](https://github.com/TaceoLabs/zkPassport-OPRF/commit/d531423158fa585a3f99a470e40800bce2d4bff8))
+
+### 🚜 Refactor
+
+
+- *(node)* [**breaking**] Remove health check service - ([c71dd4a](https://github.com/TaceoLabs/zkPassport-OPRF/commit/c71dd4accf2a10759132f7ecea04658ad404a1e9))
+- *(node)* Add v2 service and move face-match to v1. Adds an oracle proxy - ([284b746](https://github.com/TaceoLabs/zkPassport-OPRF/commit/284b7466fcdbf696c2e8d3d93c2768da65fe0abc))
+
+
 ## [0.1.0]
 
 ### ⛰️ Features

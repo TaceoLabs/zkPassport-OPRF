@@ -1,17 +1,27 @@
 use std::sync::{Arc, Mutex};
 
 use taceo_oprf::types::{ark_babyjubjub, async_trait::async_trait};
-use zkpassport_oprf_authentication::{AuthCommitment, ZKPassportProofResult};
+use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier, ZKPassportProofResult};
 
 use crate::services::oracle_proxy::{OracleError, OracleProxy, Result};
 
 /// A call received by [`TestOracleProxy`], with the arguments relevant for assertions.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum OracleCall {
-    SaltedIdentifier,
-    PreimageProof(AuthCommitment),
-    RegistrationCommitment,
-    SecretRotation,
+    SaltedIdentifier(ark_babyjubjub::EdwardsAffine),
+    PreimageProof {
+        blinded_query: ark_babyjubjub::EdwardsAffine,
+        salted_identifier: SaltedIdentifier,
+        commitment: AuthCommitment,
+    },
+    RegistrationCommitment {
+        salted_identifier: SaltedIdentifier,
+        commitment: AuthCommitment,
+    },
+    SecretRotation {
+        salted_identifier: SaltedIdentifier,
+        new_commitment: AuthCommitment,
+    },
     V1FaceMatch {
         blinded_query: ark_babyjubjub::EdwardsAffine,
         proofs: Vec<ZKPassportProofResult>,
@@ -77,26 +87,56 @@ impl TestOracleProxy {
 
 #[async_trait]
 impl OracleProxy for TestOracleProxy {
-    async fn salted_identifier(&self) -> Result<()> {
-        self.outcome(OracleCall::SaltedIdentifier)
+    async fn salted_identifier(
+        &self,
+        blinded_query: ark_babyjubjub::EdwardsAffine,
+        _proofs: &[ZKPassportProofResult],
+    ) -> Result<()> {
+        self.outcome(OracleCall::SaltedIdentifier(blinded_query))
     }
 
-    async fn preimage_proof(&self, auth_commitment: &AuthCommitment) -> Result<()> {
-        self.outcome(OracleCall::PreimageProof(*auth_commitment))?;
+    async fn preimage_proof(
+        &self,
+        blinded_query: ark_babyjubjub::EdwardsAffine,
+        salted_identifier: SaltedIdentifier,
+        auth_commitment: AuthCommitment,
+        _proofs: &[ZKPassportProofResult],
+    ) -> Result<()> {
+        self.outcome(OracleCall::PreimageProof {
+            blinded_query,
+            salted_identifier,
+            commitment: auth_commitment,
+        })?;
         match *self.preimage_of.lock().expect("not poisoned") {
-            Some(known) if known != *auth_commitment => {
+            Some(known) if known != auth_commitment => {
                 Err(OracleError::BadRequest("unknown preimage".to_owned()))
             }
             _ => Ok(()),
         }
     }
 
-    async fn registration_commitment(&self) -> Result<()> {
-        self.outcome(OracleCall::RegistrationCommitment)
+    async fn registration_commitment(
+        &self,
+        salted_identifier: SaltedIdentifier,
+        commitment: AuthCommitment,
+        _proofs: &[ZKPassportProofResult],
+    ) -> Result<()> {
+        self.outcome(OracleCall::RegistrationCommitment {
+            salted_identifier,
+            commitment,
+        })
     }
 
-    async fn secret_rotation(&self) -> Result<()> {
-        self.outcome(OracleCall::SecretRotation)
+    async fn secret_rotation(
+        &self,
+        salted_identifier: SaltedIdentifier,
+        new_commitment: AuthCommitment,
+        _proofs: &[ZKPassportProofResult],
+    ) -> Result<()> {
+        self.outcome(OracleCall::SecretRotation {
+            salted_identifier,
+            new_commitment,
+        })
     }
 
     async fn v1_face_match(

@@ -63,14 +63,26 @@ impl NullifierAuthenticator {
 
     async fn authenticate_inner(
         &self,
-        req: &NullifierRequestAuth,
+        request: &OprfRequest<NullifierRequestAuth>,
     ) -> Result<OprfKeyId, NullifierAuthenticatorError> {
-        if req.oprf_key_id == zkpassport_oprf_authentication::registration_oprf_key_id() {
+        let OprfRequest {
+            request_id: _,
+            blinded_query,
+            auth,
+        } = request;
+        if auth.oprf_key_id == zkpassport_oprf_authentication::registration_oprf_key_id() {
             return Err(NullifierAuthenticatorError::RequestedOprfRegistrationKey);
         }
-        let auth_commitment = self.db.fetch_commitment(req.salted_identifier).await?;
-        self.proxy.preimage_proof(&auth_commitment).await?;
-        Ok(req.oprf_key_id)
+        let auth_commitment = self.db.fetch_commitment(auth.salted_identifier).await?;
+        self.proxy
+            .preimage_proof(
+                *blinded_query,
+                auth.salted_identifier,
+                auth_commitment,
+                &auth.proofs,
+            )
+            .await?;
+        Ok(auth.oprf_key_id)
     }
 }
 
@@ -83,7 +95,7 @@ impl OprfRequestAuthenticator for NullifierAuthenticator {
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
-        self.authenticate_inner(&request.auth)
+        self.authenticate_inner(request)
             .await
             .inspect_err(NullifierAuthenticatorError::log)
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))
@@ -163,7 +175,11 @@ mod tests {
         // the oracle verifies the preimage proof against the commitment stored for `I`
         assert_eq!(
             oracle.calls(),
-            vec![OracleCall::PreimageProof(commitment())]
+            vec![OracleCall::PreimageProof {
+                blinded_query: request.blinded_query,
+                salted_identifier: id,
+                commitment: commitment(),
+            }]
         );
         Ok(())
     }

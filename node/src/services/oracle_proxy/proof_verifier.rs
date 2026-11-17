@@ -9,26 +9,57 @@ use taceo_oprf::{
     types::{ark_babyjubjub, async_trait::async_trait},
 };
 use tracing::instrument;
-use zkpassport_oprf_authentication::{AuthCommitment, ZKPassportProofResult};
+use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier, ZKPassportProofResult};
 
 use crate::{
     config::RetryLayerConfig,
     services::oracle_proxy::{OracleError, OracleProxy, Result},
 };
 
-/// Request body sent to the oracle's face-match verification endpoint.
+const FACE_MATCH_PATH: &str = "verify-oprf-auth";
+const IDENTIFY_PATH: &str = "oprf/v2/identify";
+const REGISTER_PATH: &str = "oprf/v2/register";
+const QUERY_PATH: &str = "oprf/v2/query";
+const ROTATE_PATH: &str = "oprf/v2/rotate";
+
+/// Request body of the oracle's face-match endpoint.
 #[derive(Debug, Serialize)]
-struct OracleFaceMatchRequest<'a> {
-    #[serde(serialize_with = "serialize_point_to_hex")]
-    /// The blinded unique identifier (`BabyJubJub` affine point), hex-encoded as `"0x<x><y>"`.
-    blinded_unique_identifier: ark_babyjubjub::EdwardsAffine,
-    /// The zkPassport proofs submitted by the client.
+struct FaceMatchRequest<'a> {
+    blinded_unique_identifier: HexPoint,
     proofs: &'a [ZKPassportProofResult],
 }
 
-/// Response body received from the oracle's verification endpoint.
+/// Request body of `oprf/v2/identify`.
+#[derive(Debug, Serialize)]
+struct IdentifyRequest<'a> {
+    proofs: &'a [ZKPassportProofResult],
+    blinded_query: HexPoint,
+}
+
+/// Request body of `oprf/v2/register` and `oprf/v2/rotate`.
+#[derive(Debug, Serialize)]
+struct CommitmentRequest<'a> {
+    proofs: &'a [ZKPassportProofResult],
+    #[serde(rename = "I")]
+    salted_identifier: SaltedIdentifier,
+    /// The commitment to check the registration proof against.
+    commitment: AuthCommitment,
+}
+
+/// Request body of `oprf/v2/query`.
+#[derive(Debug, Serialize)]
+struct QueryRequest<'a> {
+    proofs: &'a [ZKPassportProofResult],
+    blinded_query: HexPoint,
+    #[serde(rename = "I")]
+    salted_identifier: SaltedIdentifier,
+    /// The commitment stored for `I`.
+    commitment: AuthCommitment,
+}
+
+/// Response body received from the oracle's verification endpoints.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct OracleFaceMatchResponse {
+pub(crate) struct OracleResponse {
     /// Whether the oracle accepted the proofs.
     verified: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -36,16 +67,19 @@ pub(crate) struct OracleFaceMatchResponse {
     error: Option<String>,
 }
 
-const FACE_MATCH_PATH: &str = "verify-oprf-auth";
-const PASSPORT_PROOF_PATH: &str = "verify-passport-proof";
-
 /// Full oracle endpoint URLs, derived once from the configured base URL.
 #[derive(Debug, Clone)]
 struct OracleEndpoints {
     /// `<base>/verify-oprf-auth`, used by v1 face-match authentication.
     face_match: Url,
-    /// `<base>/verify-passport-proof`, used by v2 registration and preimage proofs.
-    passport_proof: Url,
+    /// `<base>/oprf/v2/identify`, used by [`OracleProxy::salted_identifier`].
+    identify: Url,
+    /// `<base>/oprf/v2/register`, used by [`OracleProxy::registration_commitment`].
+    register: Url,
+    /// `<base>/oprf/v2/query`, used by [`OracleProxy::preimage_proof`].
+    query: Url,
+    /// `<base>/oprf/v2/rotate`, used by [`OracleProxy::secret_rotation`].
+    rotate: Url,
 }
 
 impl OracleEndpoints {
@@ -68,7 +102,10 @@ impl OracleEndpoints {
         };
         Ok(Self {
             face_match: endpoint(FACE_MATCH_PATH)?,
-            passport_proof: endpoint(PASSPORT_PROOF_PATH)?,
+            identify: endpoint(IDENTIFY_PATH)?,
+            register: endpoint(REGISTER_PATH)?,
+            query: endpoint(QUERY_PATH)?,
+            rotate: endpoint(ROTATE_PATH)?,
         })
     }
 }
@@ -99,80 +136,14 @@ impl ProofVerifierOracle {
         })
     }
 
-    async fn with_retry<F, Fut, T>(&self, op_name: &str, f: F) -> Result<T>
-    where
-        F: Fn() -> Fut,
-        Fut: Future<Output = Result<T>>,
-    {
-        f.retry(self.backoff)
-            .sleep(tokio::time::sleep)
-            .when(is_retryable_error)
-            .notify(|err, duration| {
-                tracing::warn!(%err, retry_in = ?duration, "retrying {op_name} request to oracle");
-            })
-            .await
-    }
-}
-
-#[async_trait]
-impl OracleProxy for ProofVerifierOracle {
-    #[instrument(level = "debug", skip_all)]
-    async fn salted_identifier(&self) -> Result<()> {
-        tracing::trace!(
-            "sending verify request to oracle: {}",
-            self.endpoints.passport_proof
-        );
-        Ok(())
-    }
-
-    #[instrument(level = "debug", skip_all)]
-    async fn preimage_proof(&self, _auth_commitment: &AuthCommitment) -> Result<()> {
-        tracing::trace!(
-            "sending verify request to oracle: {}",
-            self.endpoints.passport_proof
-        );
-        Ok(())
-    }
-
-    #[instrument(level = "debug", skip_all)]
-    async fn registration_commitment(&self) -> Result<()> {
-        tracing::trace!(
-            "sending verify request to oracle: {}",
-            self.endpoints.passport_proof
-        );
-        Ok(())
-    }
-
-    #[instrument(level = "debug", skip_all)]
-    async fn secret_rotation(&self) -> Result<()> {
-        tracing::trace!(
-            "sending verify request to oracle: {}",
-            self.endpoints.passport_proof
-        );
-        Ok(())
-    }
-
-    #[instrument(level = "debug", skip_all)]
-    async fn v1_face_match(
-        &self,
-        blinded_query: ark_babyjubjub::EdwardsAffine,
-        proofs: &[ZKPassportProofResult],
-    ) -> Result<()> {
-        let request = OracleFaceMatchRequest {
-            blinded_unique_identifier: blinded_query,
-            proofs,
-        };
-        tracing::trace!(
-            "sending verify request to oracle: {}",
-            self.endpoints.face_match
-        );
-        self.with_retry("face_match", || async {
-            let response = self
-                .client
-                .post(self.endpoints.face_match.clone())
-                .json(&request)
-                .send()
-                .await?;
+    /// Posts `body` to `url`, retrying transient failures.
+    ///
+    /// `Ok(())` iff the oracle answered 200. A 400 becomes [`OracleError::BadRequest`] with the
+    /// oracle's error message.
+    async fn post(&self, url: &Url, body: &impl Serialize) -> Result<()> {
+        tracing::trace!("sending verify request to oracle: {url}");
+        (|| async {
+            let response = self.client.post(url.clone()).json(body).send().await?;
             let status = response.status();
             if status == StatusCode::OK {
                 tracing::trace!("oracle verified proofs successfully");
@@ -180,7 +151,7 @@ impl OracleProxy for ProofVerifierOracle {
             } else if status == StatusCode::BAD_REQUEST {
                 tracing::trace!("received BAD REQUEST from oracle");
                 let body = response.text().await?;
-                let error_msg = match serde_json::from_str::<OracleFaceMatchResponse>(&body) {
+                let error_msg = match serde_json::from_str::<OracleResponse>(&body) {
                     Ok(response) => response.error.unwrap_or_else(|| "unknown".to_owned()),
                     Err(err) => {
                         tracing::error!(%err, "could not parse oracle verify response: {err}");
@@ -194,46 +165,112 @@ impl OracleProxy for ProofVerifierOracle {
                 Err(OracleError::UnexpectedStatusCode { status, body })
             }
         })
+        .retry(self.backoff)
+        .sleep(tokio::time::sleep)
+        .when(is_retryable_error)
+        .notify(|err, duration| {
+            tracing::warn!(%err, retry_in = ?duration, "retrying request to {url}");
+        })
         .await
     }
 }
 
-/// Serialize a `BabyJubJub` affine point to a `"0x<x><y>"` hex string.
+#[async_trait]
+impl OracleProxy for ProofVerifierOracle {
+    #[instrument(level = "debug", skip_all)]
+    async fn salted_identifier(
+        &self,
+        blinded_query: ark_babyjubjub::EdwardsAffine,
+        proofs: &[ZKPassportProofResult],
+    ) -> Result<()> {
+        let request = IdentifyRequest {
+            proofs,
+            blinded_query: HexPoint(blinded_query),
+        };
+        self.post(&self.endpoints.identify, &request).await
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    async fn registration_commitment(
+        &self,
+        salted_identifier: SaltedIdentifier,
+        commitment: AuthCommitment,
+        proofs: &[ZKPassportProofResult],
+    ) -> Result<()> {
+        let request = CommitmentRequest {
+            proofs,
+            salted_identifier,
+            commitment,
+        };
+        self.post(&self.endpoints.register, &request).await
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    async fn preimage_proof(
+        &self,
+        blinded_query: ark_babyjubjub::EdwardsAffine,
+        salted_identifier: SaltedIdentifier,
+        auth_commitment: AuthCommitment,
+        proofs: &[ZKPassportProofResult],
+    ) -> Result<()> {
+        let request = QueryRequest {
+            proofs,
+            blinded_query: HexPoint(blinded_query),
+            salted_identifier,
+            commitment: auth_commitment,
+        };
+        self.post(&self.endpoints.query, &request).await
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    async fn secret_rotation(
+        &self,
+        salted_identifier: SaltedIdentifier,
+        new_commitment: AuthCommitment,
+        proofs: &[ZKPassportProofResult],
+    ) -> Result<()> {
+        let request = CommitmentRequest {
+            proofs,
+            salted_identifier,
+            commitment: new_commitment,
+        };
+        self.post(&self.endpoints.rotate, &request).await
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    async fn v1_face_match(
+        &self,
+        blinded_query: ark_babyjubjub::EdwardsAffine,
+        proofs: &[ZKPassportProofResult],
+    ) -> Result<()> {
+        let request = FaceMatchRequest {
+            blinded_unique_identifier: HexPoint(blinded_query),
+            proofs,
+        };
+        self.post(&self.endpoints.face_match, &request).await
+    }
+}
+
+/// A `BabyJubJub` affine point, serialized as the hex string `"0x<x><y>"`.
 ///
-/// Coordinates are serialized in big-endian byte order to match the circuit's
-/// public output format. `ark-serialize` returns little-endian bytes, so both
-/// coordinate byte vectors are reversed before encoding.
-fn serialize_point_to_hex<S: Serializer>(
-    point: &ark_babyjubjub::EdwardsAffine,
-    ser: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    // Serialize x and y coordinates in big-endian to match the circuit's public output format
-    // `blinded_query` in circuit returns (x, y) as Field elements which are big-endian
-    let mut x_bytes = Vec::new();
-    point
-        .x
-        .serialize_compressed(&mut x_bytes)
-        .map_err(S::Error::custom)?;
+/// Both coordinates are big-endian, matching the public outputs of the circuits.
+#[derive(Debug)]
+struct HexPoint(ark_babyjubjub::EdwardsAffine);
 
-    x_bytes.reverse(); // ark serializes in little-endian, circuit outputs are big-endian
-
-    let mut y_bytes = Vec::new();
-    point
-        .y
-        .serialize_compressed(&mut y_bytes)
-        .map_err(S::Error::custom)?;
-    y_bytes.reverse();
-
-    let mut hex_x = String::with_capacity(x_bytes.len() * 2);
-    for b in &x_bytes {
-        write!(&mut hex_x, "{b:02x}").expect("Write to a string should never panic");
+impl Serialize for HexPoint {
+    fn serialize<S: Serializer>(&self, ser: S) -> std::result::Result<S::Ok, S::Error> {
+        let mut hex = String::from("0x");
+        for coordinate in [self.0.x, self.0.y] {
+            let mut little_endian = Vec::new();
+            coordinate
+                .serialize_compressed(&mut little_endian)
+                .map_err(S::Error::custom)?;
+            for byte in little_endian.iter().rev() {
+                write!(hex, "{byte:02x}").expect("writing to a string cannot fail");
+            }
+        }
+        ser.serialize_str(&hex)
     }
-
-    let mut hex_y = String::with_capacity(y_bytes.len() * 2);
-    for b in &y_bytes {
-        write!(&mut hex_y, "{b:02x}").expect("Write to a string should never panic");
-    }
-    ser.serialize_str(&format!("0x{hex_x}{hex_y}"))
 }
 
 fn is_retryable_error(e: &OracleError) -> bool {
@@ -435,6 +472,79 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn v2_request_bodies_test() -> eyre::Result<()> {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let record = |path: &'static str| {
+            let tx = tx.clone();
+            post(move |Json(body): Json<serde_json::Value>| async move {
+                tx.send((path, body)).expect("receiver alive");
+                (AxumStatus::OK, Json(json!({ "verified": true })))
+            })
+        };
+        let app = Router::new()
+            .route(&format!("/{IDENTIFY_PATH}"), record(IDENTIFY_PATH))
+            .route(&format!("/{REGISTER_PATH}"), record(REGISTER_PATH))
+            .route(&format!("/{QUERY_PATH}"), record(QUERY_PATH))
+            .route(&format!("/{ROTATE_PATH}"), record(ROTATE_PATH));
+        let (_server, oracle) = serve(app, RetryLayerConfig::disabled())?;
+
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let blinding_factor = taceo_oprf::core::oprf::BlindingFactor::from_scalar(fixture.beta)
+            .expect("Invalid blinding factor");
+        let blinded_query =
+            taceo_oprf::core::oprf::client::blind_query(fixture.private_nullifier, blinding_factor)
+                .blinded_query();
+        let id = SaltedIdentifier::from(ark_babyjubjub::EdwardsAffine::default());
+        let commitment = AuthCommitment::from(ark_babyjubjub::Fq::from(42u64));
+        let proofs = &fixture.proofs;
+        let proofs_json = serde_json::to_value(proofs)?;
+        // produced by zkPassport, not by our serialization
+        let hex_query =
+            &zkpassport_oprf_test_utils::fixtures::load_fixture_json()["blinded_unique_identifier"];
+
+        oracle.salted_identifier(blinded_query, proofs).await?;
+        oracle
+            .registration_commitment(id, commitment, proofs)
+            .await?;
+        oracle
+            .preimage_proof(blinded_query, id, commitment, proofs)
+            .await?;
+        oracle.secret_rotation(id, commitment, proofs).await?;
+
+        let mut bodies = Vec::new();
+        while let Ok(received) = rx.try_recv() {
+            bodies.push(received);
+        }
+        assert_eq!(
+            bodies,
+            vec![
+                (
+                    IDENTIFY_PATH,
+                    json!({ "proofs": proofs_json, "blinded_query": hex_query })
+                ),
+                (
+                    REGISTER_PATH,
+                    json!({ "proofs": proofs_json, "I": ["0", "1"], "commitment": "42" })
+                ),
+                (
+                    QUERY_PATH,
+                    json!({
+                        "proofs": proofs_json,
+                        "blinded_query": hex_query,
+                        "I": ["0", "1"],
+                        "commitment": "42"
+                    })
+                ),
+                (
+                    ROTATE_PATH,
+                    json!({ "proofs": proofs_json, "I": ["0", "1"], "commitment": "42" })
+                ),
+            ]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn retryable_errors() -> eyre::Result<()> {
         let status_error = |status| OracleError::UnexpectedStatusCode {
             status,
@@ -490,6 +600,22 @@ mod tests {
             assert_eq!(
                 endpoints.face_match.as_str(),
                 "http://oracle:8080/api/verify-oprf-auth?devmode=true"
+            );
+            assert_eq!(
+                endpoints.identify.as_str(),
+                "http://oracle:8080/api/oprf/v2/identify?devmode=true"
+            );
+            assert_eq!(
+                endpoints.register.as_str(),
+                "http://oracle:8080/api/oprf/v2/register?devmode=true"
+            );
+            assert_eq!(
+                endpoints.query.as_str(),
+                "http://oracle:8080/api/oprf/v2/query?devmode=true"
+            );
+            assert_eq!(
+                endpoints.rotate.as_str(),
+                "http://oracle:8080/api/oprf/v2/rotate?devmode=true"
             );
         }
         for environment in [Environment::Test, Environment::Prod] {

@@ -261,6 +261,7 @@ impl TestNodes {
         let request = CommitmentRotationRequest {
             salted_identifier,
             new_commitment,
+            proofs: vec![],
         };
         self.post(node, "rotation", &request).await
     }

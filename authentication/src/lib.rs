@@ -103,6 +103,9 @@ pub struct CommitmentRotationRequest {
     pub salted_identifier: SaltedIdentifier,
     /// The new commitment to persist in the database
     pub new_commitment: AuthCommitment,
+    /// zkPassport proofs: the base proofs, a face match and the client's proof that it knows
+    /// the opening of `new_commitment`
+    pub proofs: Vec<ZKPassportProofResult>,
 }
 
 /// Raw value of the global OPRF key used to derive user identifiers during registration.
@@ -200,7 +203,6 @@ pub struct RegistrationRequest {
     pub commitment: AuthCommitment,
     /// zkPassport proofs, including the client's OPRF proof that `I` is the output of the
     /// registration OPRF evaluation
-    // TODO: the registration circuits do not exist yet.
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
@@ -395,10 +397,12 @@ mod tests {
         let request = CommitmentRotationRequest {
             salted_identifier: identifier(),
             new_commitment: commitment(43),
+            proofs: vec![],
         };
         let expected = json!({
             "I": ["0", "1"],
             "new_commitment": "43",
+            "proofs": [],
         });
         assert_wire_format(&request, &expected);
     }

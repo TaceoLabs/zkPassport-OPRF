@@ -36,12 +36,10 @@ impl OprfRequestAuthenticator for RegisterAuthenticator {
     #[instrument(level = "info", skip_all)]
     async fn authenticate(
         &self,
-        _request: &OprfRequest<Self::RequestAuth>,
+        request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
-        // TODO: forward the `blinded_query` together with the proofs (like face-match
-        // does) once `OracleProxy::salted_identifier` takes a request.
         self.proxy
-            .salted_identifier()
+            .salted_identifier(request.blinded_query, &request.auth.proofs)
             .await
             .inspect_err(OracleError::log)
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))?;
@@ -68,10 +66,6 @@ mod tests {
         services::oracle_proxy::test::{OracleCall, TestOracleProxy},
     };
 
-    // TODO: once `OracleProxy::salted_identifier` sends requests to the proof-verifier, add
-    // tests against `shared_proof_verifier()` like for face-match (invalid proofs, missing
-    // proofs, blinded query mismatch, oracle unreachable).
-
     fn build_request(fixture: FixtureData) -> OprfRequest<RegisterRequestAuth> {
         let blinding_factor =
             BlindingFactor::from_scalar(fixture.beta).expect("Invalid blinding factor");
@@ -92,7 +86,10 @@ mod tests {
         let auth_service = RegisterAuthenticator::init(oracle.clone());
         let oprf_key = auth_service.authenticate(&request).await?;
         assert_eq!(oprf_key, registration_oprf_key_id());
-        assert_eq!(oracle.calls(), vec![OracleCall::SaltedIdentifier]);
+        assert_eq!(
+            oracle.calls(),
+            vec![OracleCall::SaltedIdentifier(request.blinded_query)]
+        );
         Ok(())
     }
 

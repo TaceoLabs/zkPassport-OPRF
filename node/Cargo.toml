@@ -17,7 +17,7 @@ axum = { workspace = true }
 backon = { workspace = true, features = ["std", "tokio-sleep"] }
 config = { workspace = true }
 eyre.workspace = true
-humantime-serde.workspace = true
+jiff.workspace = true
 metrics = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls", "json"] }
 rustls = { workspace = true }

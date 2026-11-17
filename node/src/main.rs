@@ -38,7 +38,7 @@ struct FullZkPassportNodeConfig {
     /// The bind addr of the AXUM server
     #[serde(
         default = "default_delay_retry_load_node_information",
-        with = "humantime_serde"
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required"
     )]
     pub delay_retry_load_node_information: Duration,
     /// The OPRF service config

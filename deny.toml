@@ -74,6 +74,8 @@ ignore = [
   { id = "RUSTSEC-2024-0388", reason = "derivative crate is unmaintained, but arkworks is still using it." },
   { id = "RUSTSEC-2026-0173", reason = "need to wait until alloy removes. Not relevant as only error reporting" },
   { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 via elliptic-curve 0.13 (alloy, k256); fix only in 0.7. Wait for upstream." },
+  { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained. Pulled in by telemetry-batteries and axum-test (expect-json). Wait for upstream." },
+  { id = "RUSTSEC-2026-0542", reason = "humantime is unmaintained. Pulled in by taceo-nodes-common, taceo-oprf-service and taceo-oprf-dev-client. Wait for upstream." },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.

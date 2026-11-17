@@ -18,7 +18,7 @@ pub struct ZkPassportNodeConfig {
 
     /// Request timeout when talking to the verifier oracle.
     #[serde(default = "ZkPassportNodeConfig::default_oracle_request_timeout")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required")]
     pub oracle_request_timeout: Duration,
 
     /// The retry layer config for requests to the verifier oracle.
@@ -40,14 +40,14 @@ pub struct RetryLayerConfig {
     /// Min interval for retry layer when encountering retryable errors during requests to the verifier oracle.
     #[serde(
         default = "RetryLayerConfig::default_verifier_request_min_delay",
-        with = "humantime_serde"
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required"
     )]
     pub verifier_request_min_delay: Duration,
 
     /// Max interval for retry layer when encountering retryable errors during requests to the verifier oracle.
     #[serde(
         default = "RetryLayerConfig::default_verifier_request_max_delay",
-        with = "humantime_serde"
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required"
     )]
     pub verifier_request_max_delay: Duration,
 

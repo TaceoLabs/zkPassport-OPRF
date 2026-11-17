@@ -174,11 +174,12 @@ mod tests {
         assert_eq!(oprf_key.into_inner(), 2);
         // the oracle verifies the preimage proof against the commitment stored for `I`
         assert_eq!(
-            oracle.calls(),
+            oracle.take_calls(),
             vec![OracleCall::PreimageProof {
                 blinded_query: request.blinded_query,
                 salted_identifier: id,
                 commitment: commitment(),
+                proofs: request.auth.proofs.clone(),
             }]
         );
         Ok(())
@@ -198,7 +199,7 @@ mod tests {
             .await
             .expect_err("Should fail");
         assert_eq!(err.code(), error_codes::REQUESTED_OPRF_REGISTRATION_KEY);
-        assert_eq!(oracle.calls(), vec![]);
+        assert_eq!(oracle.take_calls(), vec![]);
         Ok(())
     }
 
@@ -215,7 +216,7 @@ mod tests {
             .await
             .expect_err("Should fail");
         assert_eq!(err.code(), error_codes::UNKNOWN_IDENTIFIER);
-        assert_eq!(oracle.calls(), vec![]);
+        assert_eq!(oracle.take_calls(), vec![]);
         Ok(())
     }
 
@@ -236,7 +237,7 @@ mod tests {
         // a DB failure must not be reported as an unknown identifier
         assert_eq!(err.code(), error_codes::INTERNAL);
         assert_eq!(err.message(), "internal");
-        assert_eq!(oracle.calls(), vec![]);
+        assert_eq!(oracle.take_calls(), vec![]);
         Ok(())
     }
 

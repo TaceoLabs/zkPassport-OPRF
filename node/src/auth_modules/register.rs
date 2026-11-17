@@ -87,8 +87,11 @@ mod tests {
         let oprf_key = auth_service.authenticate(&request).await?;
         assert_eq!(oprf_key, registration_oprf_key_id());
         assert_eq!(
-            oracle.calls(),
-            vec![OracleCall::SaltedIdentifier(request.blinded_query)]
+            oracle.take_calls(),
+            vec![OracleCall::SaltedIdentifier {
+                blinded_query: request.blinded_query,
+                proofs: request.auth.proofs.clone(),
+            }]
         );
         Ok(())
     }

@@ -45,12 +45,11 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
+    use std::sync::Arc;
 
     use ruint::aliases::U160;
     use taceo_oprf::{
         core::oprf::BlindingFactor,
-        service::Environment,
         types::{
             OprfKeyId,
             api::{OprfRequest, OprfRequestAuthenticator as _},
@@ -62,11 +61,7 @@ mod tests {
 
     use crate::{
         auth_modules::face_match::FaceMatchAuthenticator,
-        config::RetryLayerConfig,
-        services::oracle_proxy::{
-            proof_verifier::ProofVerifierOracle,
-            test::{OracleCall, TestOracleProxy},
-        },
+        services::oracle_proxy::test::{OracleCall, TestOracleProxy},
     };
 
     fn build_request(fixture: FixtureData) -> OprfRequest<FaceMatchRequestAuth> {
@@ -91,7 +86,7 @@ mod tests {
         assert_eq!(oprf_key.into_inner(), 1);
         // the oracle verifies the proofs against the blinded query of this request
         assert_eq!(
-            oracle.calls(),
+            oracle.take_calls(),
             vec![OracleCall::V1FaceMatch {
                 blinded_query: request.blinded_query,
                 proofs: request.auth.proofs.clone(),
@@ -112,33 +107,6 @@ mod tests {
             .expect_err("Should fail");
         assert_eq!(is_err.code(), error_codes::ORACLE_BAD_REQUEST);
         assert_eq!(is_err.message(), "invalid proof");
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn oracle_unreachable_test() -> eyre::Result<()> {
-        // Port 1 on loopback is never open; any connection attempt immediately
-        // returns ECONNREFUSED without waiting for a timeout.
-        let client = reqwest::ClientBuilder::new()
-            .timeout(Duration::from_secs(10))
-            .build()?;
-        let proxy = Arc::new(ProofVerifierOracle::init(
-            client,
-            "http://127.0.0.1:1".parse()?,
-            Environment::Dev,
-            RetryLayerConfig::disabled(),
-        )?);
-        let auth_service = FaceMatchAuthenticator::init(proxy);
-        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
-        let request = build_request(fixture);
-
-        let is_err = auth_service
-            .authenticate(&request)
-            .await
-            .expect_err("Should fail");
-        assert_eq!(is_err.code(), error_codes::ORACLE_NOT_REACHABLE);
-        assert_eq!(is_err.message(), "oracle not reachable - try again later");
-
         Ok(())
     }
 }

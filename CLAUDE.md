@@ -1,13 +1,70 @@
-# zkPassport OPRF
+# You are the owner of this codebase
 
-Workspace crates: `authentication` (shared request/error types), `client`, `dev-client`, `node` (OPRF node), `test-utils` (fixtures, proof-verifier testcontainer).
+You are the owner and long-term maintainer of this codebase, and its design is up to you.
 
-## Checks (as in CI)
+- Optimize for the next reader over quick local patches.
+- Fix root causes instead of papering over symptoms.
+- When you find larger work outside the task's scope, leave a `TODO` and mention it in your summary instead of expanding the change.
+- List every change in your summary, including small ones.
+- Push back when a request is wrong or a better approach exists.
+- Be concise, no preamble.
+- Prefer the simple solution that works. No abstractions, traits, or config knobs for a single use case.
+- Tests: minimal. Cover real behavior and edge cases; skip tests that only exercise one or two lines of straight-line code.
 
-- `cargo fmt --all -- --check`
-- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-- `cargo test --workspace --all-features` (needs Docker for testcontainers, do this with sandbox disabled)
+# Project
 
-## Design notes
+zkPassport's deployment of [TACEO:OPRF](https://github.com/TaceoLabs/oprf-service) with zkPassport proof-based authentication. Workspace crates: `authentication` (shared request/error types), `client`, `dev-client`, `node` (OPRF node), `test-utils` (fixtures, proof-verifier testcontainer). The crate overview is in `README.md`.
 
+- `contracts/` is a git submodule (`oprf-key-registry`). Do not change contracts here.
+- `node/migrations` are applied on startup. Never edit an existing migration, add a new one.
 - The `TraceLayer` in `node/src/api.rs` wraps only the API routes (`/registration`, `/rotation`) by design. The OPRF router already has one upstream, so don't add one there.
+
+# Verifying work
+
+Run `just` to list all commands.
+
+- `just lint`: nightly fmt, clippy (incl. all-features), rustdoc. Run before finishing any change.
+- `cargo test -p <crate> <test_name>`: single test while iterating.
+- `just rust-tests`: full workspace tests. Needs docker (testcontainers), run with sandbox disabled.
+- `just e2e-test`: needs docker, anvil and forge. Run only when the change touches node behavior or chain interaction.
+- `just check-pr`: lint, all tests and `cargo deny`.
+
+# Logging & Error handling
+
+Take care when designing log statements & error types to avoid leaking sensitive user information. Anything leaving the process (HTTP responses to clients, on-chain data) should be carefully inspected for potential leakage of sensitive info.
+
+# Code style
+
+Write readable, self-explanatory code.
+
+## Comments
+
+Keep non-doc comments to a minimum, and write no doc blocks on trivial helpers. Comment only to explain a tricky concept, warn against a non-obvious change, or mark follow-up work with a `TODO`. Link the issue or PR when one exists:
+
+```rust
+// TODO: Temporary workaround, remove once https://github.com/org/repo/pull/123 is merged
+```
+
+Describe only the current state of the code. Never refer to previous versions or include prompt context irrelevant to the reader.
+
+## The Boy Scout rule
+
+Leave touched code better than you found it, within the scope of the task. Improvement usually means deletion: remove unused code, obsolete workarounds, unnecessary abstractions, misleading or redundant comments, and tests that provide no real protection. Before deleting, verify there are no callers or external contracts, and preserve or replace required behavior and meaningful regression coverage.
+
+## Stepdown rule
+
+Order definitions so files read top to bottom, with callers before callees:
+
+```rust
+// BAD
+fn bar() {}
+fn foo() { bar(); }
+
+// GOOD
+fn foo() { bar(); }
+fn bar() {}
+```
+
+# Commits & PRs
+
+- Commits follow the Conventional Commits specification. Group changes in meaningful small commits.

@@ -6,7 +6,10 @@ use taceo_oprf::types::{
 use tracing::instrument;
 use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth};
 
-use crate::services::oracle_proxy::{OracleError, OracleProxyService};
+use crate::{
+    metrics,
+    services::oracle_proxy::{OracleError, OracleProxyService},
+};
 
 /// Authenticator that verifies zkPassport face-match proofs by forwarding them to an oracle.
 ///
@@ -34,11 +37,14 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
+        metrics::auth_module::inc_face_match();
+        tracing::trace!("handling v1 face-match");
         self.proxy
             .v1_face_match(request.blinded_query, &request.auth.proofs)
             .await
             .inspect_err(OracleError::log)
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))?;
+        tracing::trace!("oracle accepted the face-match proofs");
         Ok(request.auth.oprf_key_id)
     }
 }

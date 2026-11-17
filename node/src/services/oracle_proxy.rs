@@ -196,7 +196,7 @@ pub trait OracleProxy {
     /// commitment `x̂'`.
     ///
     /// No `nonce`, `challenge`, or `timestamp` is added. Nodes MUST reject a registration if a
-    /// commitment for `I` is already stored, so a replay is a no-op.
+    /// commitment for `I` is already stored, so a replay is rejected.
     async fn registration_commitment(
         &self,
         salted_identifier: SaltedIdentifier,

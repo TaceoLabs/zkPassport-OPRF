@@ -1,4 +1,4 @@
-use std::fmt::Write as _;
+use std::{fmt::Write as _, time::Instant};
 
 use ark_serialize::CanonicalSerialize as _;
 use backon::{ExponentialBuilder, Retryable as _};
@@ -13,6 +13,7 @@ use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier, ZKPasspor
 
 use crate::{
     config::RetryLayerConfig,
+    metrics,
     services::oracle_proxy::{OracleError, OracleProxy, Result},
 };
 
@@ -140,9 +141,11 @@ impl ProofVerifierOracle {
     ///
     /// `Ok(())` iff the oracle answered 200. A 400 becomes [`OracleError::BadRequest`] with the
     /// oracle's error message.
+    #[instrument(level = "info", skip_all)]
     async fn post(&self, url: &Url, body: &impl Serialize) -> Result<()> {
         tracing::trace!("sending verify request to oracle: {url}");
-        (|| async {
+        let start = Instant::now();
+        let result = (|| async {
             let response = self.client.post(url.clone()).json(body).send().await?;
             let status = response.status();
             if status == StatusCode::OK {
@@ -154,7 +157,7 @@ impl ProofVerifierOracle {
                 let error_msg = match serde_json::from_str::<OracleResponse>(&body) {
                     Ok(response) => response.error.unwrap_or_else(|| "unknown".to_owned()),
                     Err(err) => {
-                        tracing::error!(%err, "could not parse oracle verify response: {err}");
+                        tracing::warn!(%err, "could not parse oracle verify response: {err}");
                         "unknown".to_owned()
                     }
                 };
@@ -169,15 +172,17 @@ impl ProofVerifierOracle {
         .sleep(tokio::time::sleep)
         .when(is_retryable_error)
         .notify(|err, duration| {
+            metrics::oracle::inc_retries();
             tracing::warn!(%err, retry_in = ?duration, "retrying request to {url}");
         })
-        .await
+        .await;
+        metrics::oracle::record_duration(start.elapsed());
+        result
     }
 }
 
 #[async_trait]
 impl OracleProxy for ProofVerifierOracle {
-    #[instrument(level = "debug", skip_all)]
     async fn salted_identifier(
         &self,
         blinded_query: ark_babyjubjub::EdwardsAffine,
@@ -190,7 +195,6 @@ impl OracleProxy for ProofVerifierOracle {
         self.post(&self.endpoints.identify, &request).await
     }
 
-    #[instrument(level = "debug", skip_all)]
     async fn registration_commitment(
         &self,
         salted_identifier: SaltedIdentifier,
@@ -205,7 +209,6 @@ impl OracleProxy for ProofVerifierOracle {
         self.post(&self.endpoints.register, &request).await
     }
 
-    #[instrument(level = "debug", skip_all)]
     async fn preimage_proof(
         &self,
         blinded_query: ark_babyjubjub::EdwardsAffine,
@@ -222,7 +225,6 @@ impl OracleProxy for ProofVerifierOracle {
         self.post(&self.endpoints.query, &request).await
     }
 
-    #[instrument(level = "debug", skip_all)]
     async fn secret_rotation(
         &self,
         salted_identifier: SaltedIdentifier,
@@ -237,7 +239,6 @@ impl OracleProxy for ProofVerifierOracle {
         self.post(&self.endpoints.rotate, &request).await
     }
 
-    #[instrument(level = "debug", skip_all)]
     async fn v1_face_match(
         &self,
         blinded_query: ark_babyjubjub::EdwardsAffine,

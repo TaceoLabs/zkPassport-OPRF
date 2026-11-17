@@ -11,7 +11,9 @@ use std::sync::Arc;
 
 use reqwest::StatusCode;
 use taceo_oprf::types::{ark_babyjubjub, async_trait::async_trait};
-use zkpassport_oprf_authentication::{AuthCommitment, AuthErrorKind, ZKPassportProofResult};
+use zkpassport_oprf_authentication::{
+    AuthCommitment, AuthErrorKind, SaltedIdentifier, ZKPassportProofResult,
+};
 
 pub(crate) mod proof_verifier;
 #[cfg(test)]
@@ -85,12 +87,11 @@ impl From<OracleError> for AuthErrorKind {
 /// - `B`: the blinded OPRF query, a blinding of `pn` under `r`.
 /// - `k_reg`: the global OPRF key, used for registration only.
 /// - `k_c`: the nullifier OPRF key of a zkPassport customer.
-/// - `I = OPRF(pn, k_reg)`: the [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier),
-///   a `BabyJubJub` point obtained by unblinding the registration response. It is independent
-///   of the blinding factor.
+/// - `I = OPRF(pn, k_reg)`: the [`SaltedIdentifier`], a `BabyJubJub` point obtained by unblinding
+///   the registration response. It is independent of the blinding factor.
 /// - `pi`: the Chaum-Pedersen proof returned by the OPRF nodes, attesting to the correct
 ///   evaluation under `k_reg`.
-/// - `DS_COMMIT`: the ASCII string `TACEO-zkPassport-OPRF-v2-commit` interpreted as a
+/// - `DS_COMMIT`: the ASCII string `zkpassport-oprf-v2-commit` interpreted as a
 ///   big-endian field element.
 /// - `commit(pn, s) = Poseidon2_t3([DS_COMMIT, pn, s])[1]`: the commitment to a secret `s`, where
 ///   `Poseidon2_t3` is the BN254 Poseidon2 permutation of width 3. Including `pn` keeps the
@@ -120,26 +121,25 @@ impl From<OracleError> for AuthErrorKind {
 /// step to `I`, but otherwise reveals nothing beyond `I`, which is public in all later requests.
 /// It reveals neither `pn` nor the holder's identity.
 ///
-/// # Identifier Proof
+/// # Registration Proof
 ///
-/// The identifier proof attests `I = OPRF(pn, k_reg)` for the `pn` committed in `P`. It takes
-/// `P` and `I` as public inputs and establishes:
+/// The registration proof is the zkPassport `oprf_registration` circuit. It takes `P`, `I`, the
+/// public key of `k_reg` and the commitment `x'` as public inputs and establishes:
 ///
-/// - The user knows the opening of `P`, in particular `pn`.
-/// - The registration query is a blinding of `pn` with a nonzero blinding factor `r`.
-/// - `pi` verifies against the public key of `k_reg`, authenticating the blinded query/response
-///   pair.
-/// - Unblinding the response with `r` yields `I`.
+/// - The user knows the opening of `P`, in particular its salts and `pn`.
+/// - `pi` verifies against the public key of `k_reg`, authenticating a blinded query/response
+///   pair, and unblinding the response with `r` yields `I = OPRF(pn, k_reg)`.
+/// - The user knows `x` with `x' = commit(pn, x)`.
 ///
-/// A user obtains its inputs (`r`, the response and `pi`) after the first registration step (see
-/// `RegisterAuthenticator`) and stacks it
-/// on the base proof in later requests. Its public inputs are fixed for a cached `P`, so a user
-/// MAY cache the identifier proof alongside the base proof. The cache is invalidated when either
-/// `P` or the public key of `k_reg` changes.
+/// The oracle pins the public key of `k_reg`, so a client cannot use a key of its own. A user
+/// obtains the inputs for `I` (`r`, the response and `pi`) after the first registration step (see
+/// `RegisterAuthenticator`) and stacks the proof on the base proof in later requests.
+///
+/// The oracle routes are `POST /oprf/v2/{identify,register,query,rotate}`, one per method below.
+/// Every one takes the three base proofs plus the proofs listed in its proof composition.
 #[async_trait]
 pub trait OracleProxy {
-    /// Verifies that a user is eligible to obtain the
-    /// [`SaltedIdentifier`](zkpassport_oprf_authentication::SaltedIdentifier) `I` for the passport
+    /// Verifies that a user is eligible to obtain the [`SaltedIdentifier`] `I` for the passport
     /// committed in `P`. First step of the registration process.
     ///
     /// Consumed by `RegisterAuthenticator`,
@@ -148,7 +148,9 @@ pub trait OracleProxy {
     /// # Proof Composition
     ///
     /// 1. The base proof.
-    /// 2. The query proof, see below.
+    /// 2. The query proof (`oprf_auth`), see below.
+    ///
+    /// Oracle route: `identify`, with `blinded_query` `B`.
     ///
     /// # Proof Statement
     ///
@@ -162,7 +164,7 @@ pub trait OracleProxy {
     ///
     /// # Notes
     ///
-    /// The subsequent identifier proof already rejects any `I` not computed from `pn`, so §1 is
+    /// The subsequent registration proof already rejects any `I` not computed from `pn`, so §1 is
     /// not required for soundness per se. It ensures the nodes never evaluate `k_reg` on arbitrary
     /// inputs.
     ///
@@ -170,7 +172,11 @@ pub trait OracleProxy {
     /// only recomputes the blinded response, which the client unblinds to the same public `I`.
     /// Replay reveals nothing about `pn`. A user SHOULD sample a fresh blinding factor from a
     /// cryptographically secure source of randomness.
-    async fn salted_identifier(&self) -> Result<()>;
+    async fn salted_identifier(
+        &self,
+        blinded_query: ark_babyjubjub::EdwardsAffine,
+        proofs: &[ZKPassportProofResult],
+    ) -> Result<()>;
 
     /// Verifies that the user may register the commitment `x'` for its identifier `I`. Second
     /// step of the registration process.
@@ -178,30 +184,25 @@ pub trait OracleProxy {
     /// # Proof Composition
     ///
     /// 1. The base proof.
-    /// 2. The identifier proof.
-    /// 3. The opening proof for `x'`, see below.
+    /// 2. The registration proof (`oprf_registration`) for `I` and `x'`.
     ///
-    /// # Proof Statement
-    ///
-    /// The opening proof takes `P` and `x'` as public inputs and establishes:
-    ///
-    /// §1 - Knowledge of the opening of `P`
-    ///
-    /// The user knows the opening of `P`, in particular its salts and `pn`.
-    ///
-    /// §2 - Knowledge of the preimage of `x'`
-    ///
-    /// The user knows `x` with `x' = commit(pn, x)` for the `pn` of §1.
-    ///
-    /// §1 binds `x'` to `P`. Anyone who observes the request, including a malicious node, knows
-    /// `P` but not its opening, and therefore cannot replace the opening proof with one for a
-    /// different commitment `x̂'`.
+    /// Oracle route: `register`, with `I` and `commitment` `x'`.
     ///
     /// # Notes
     ///
+    /// The registration proof binds `x'` to `P` through the opening of `P` and the preimage of
+    /// `x'`. Anyone who observes the request, including a malicious node, knows `P` but not its
+    /// opening, and therefore cannot replace the registration proof with one for a different
+    /// commitment `x̂'`.
+    ///
     /// No `nonce`, `challenge`, or `timestamp` is added. Nodes MUST reject a registration if a
     /// commitment for `I` is already stored, so a replay is a no-op.
-    async fn registration_commitment(&self) -> Result<()>;
+    async fn registration_commitment(
+        &self,
+        salted_identifier: SaltedIdentifier,
+        commitment: AuthCommitment,
+        proofs: &[ZKPassportProofResult],
+    ) -> Result<()>;
 
     /// Verifies that the user may request a salted nullifier, an opaque per-customer identifier
     /// that provides sybil resistance within the zkPassport ecosystem.
@@ -212,9 +213,12 @@ pub trait OracleProxy {
     /// # Proof Composition
     ///
     /// 1. The base proof.
-    /// 2. The identifier proof.
-    /// 3. The query proof, as in [`Self::salted_identifier`].
-    /// 4. The opening proof for `x'`, as in [`Self::registration_commitment`].
+    /// 2. The query proof (`oprf_auth`), as in [`Self::salted_identifier`].
+    /// 3. The registration proof (`oprf_registration`) for `I` and `x'`, as in
+    ///    [`Self::registration_commitment`].
+    ///
+    /// Oracle route: `query`, with `blinded_query` `B`, `I` and `commitment` `x'`, the commitment
+    /// stored for `I`.
     ///
     /// # Notes
     ///
@@ -236,7 +240,13 @@ pub trait OracleProxy {
     ///
     /// The base proof takes a `current_date` for PKI-chain verification. Nodes MAY additionally
     /// check that it lies within a reasonable window.
-    async fn preimage_proof(&self, auth_commitment: &AuthCommitment) -> Result<()>;
+    async fn preimage_proof(
+        &self,
+        blinded_query: ark_babyjubjub::EdwardsAffine,
+        salted_identifier: SaltedIdentifier,
+        auth_commitment: AuthCommitment,
+        proofs: &[ZKPassportProofResult],
+    ) -> Result<()>;
 
     /// Verifies that the user may rotate the [`AuthCommitment`] stored for `I` from `x'` to `y'`.
     ///
@@ -245,10 +255,11 @@ pub trait OracleProxy {
     /// # Proof Composition
     ///
     /// 1. The base proof.
-    /// 2. The identifier proof.
-    /// 3. The face-match proof, see below.
-    /// 4. The opening proof for `y'`, as in [`Self::registration_commitment`] with `y` in place of
-    ///    `x`.
+    /// 2. The face-match proof (`facematch`), see below.
+    /// 3. The registration proof (`oprf_registration`) for `I` and `y'`, as in
+    ///    [`Self::registration_commitment`] with `y` in place of `x`.
+    ///
+    /// Oracle route: `rotate`, with `I` and `commitment` `y'`.
     ///
     /// # Proof Statement
     ///
@@ -264,14 +275,19 @@ pub trait OracleProxy {
     ///
     /// Nodes MUST check that `I` is registered before updating the mapping.
     ///
-    /// The opening proof binds `y'` to `P`. Without this binding, anyone observing the request
+    /// The registration proof binds `y'` to `P`. Without this binding, anyone observing the request
     /// could replace `y'` with their own commitment and take over `I`.
     ///
     /// Unlike [`Self::preimage_proof`], a `nonce` or `timestamp` may be desirable. Otherwise a
     /// replay could rotate the mapping back to a commitment whose secret the user has lost,
     /// locking them out. The commitment itself may serve as nonce: nodes could persist the history
     /// of commitments per `I` and reject any `y'` seen before, which also leaves an audit trail.
-    async fn secret_rotation(&self) -> Result<()>;
+    async fn secret_rotation(
+        &self,
+        salted_identifier: SaltedIdentifier,
+        new_commitment: AuthCommitment,
+        proofs: &[ZKPassportProofResult],
+    ) -> Result<()>;
 
     /// Verifies the proofs of a v1 face-match request.
     async fn v1_face_match(

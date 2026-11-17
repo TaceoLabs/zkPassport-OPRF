@@ -87,7 +87,7 @@ See `run-setup.sh` for a complete example of all required environment variables.
 All oracle requests go through one proxy built from a base URL. Endpoint paths are appended to it:
 
 * `<base>/verify-oprf-auth`: face-match verification (v1)
-* `<base>/verify-passport-proof`: passport proof verification (v2, stub)
+* `<base>/oprf/v2/identify`, `register`, `query` and `rotate`: proof verification of the four v2 steps
 
 In the `dev` environment, `?devmode=true` is added to every endpoint. Connection errors and HTTP 408, 429, 502, 503 and 504 are retried with exponential backoff.
 
@@ -114,7 +114,12 @@ OPRF key shares are stored in a PostgreSQL schema managed by the upstream `taceo
 
 ## HTTP API
 
-* `POST /api/rotation`: replaces the commitment stored for a passport identifier `I`. Body: `{"I": <point>, "new_commitment": <field element>}`. Returns 404 for an unknown identifier. Oracle verification is still a stub.
+The node forwards the proofs of a request to the oracle and changes its database only if the oracle accepts them.
+
+* `POST /api/registration`: stores the commitment for a passport identifier `I`. Body: `{"I": <point>, "commitment": <field element>, "proofs": [<proof>, ...]}`. Returns 409 if `I` is registered with another commitment.
+* `POST /api/rotation`: replaces the commitment stored for `I`. Body: `{"I": <point>, "new_commitment": <field element>, "proofs": [<proof>, ...]}`. Returns 404 for an unknown identifier and 409 if the commitment was stored for `I` before.
+
+Repeating a request that succeeded succeeds again. Both endpoints return 400 if the oracle rejects the proofs and 503 if the oracle is not reachable.
 
 ## Architecture
 

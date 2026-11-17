@@ -176,8 +176,14 @@ async fn oracle_rejection_is_bad_request() -> eyre::Result<()> {
     assert_eq!(
         nodes.oracle.calls(),
         vec![
-            OracleCall::RegistrationCommitment,
-            OracleCall::SecretRotation
+            OracleCall::RegistrationCommitment {
+                salted_identifier: id,
+                commitment: commitment(1)
+            },
+            OracleCall::SecretRotation {
+                salted_identifier: id,
+                new_commitment: commitment(2)
+            }
         ]
     );
     Ok(())

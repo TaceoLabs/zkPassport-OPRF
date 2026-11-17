@@ -38,10 +38,12 @@ async fn rotation(
     Json(CommitmentRotationRequest {
         salted_identifier,
         new_commitment,
+        proofs,
     }): Json<CommitmentRotationRequest>,
 ) -> ApiResult<()> {
-    // TODO: unauthenticated until the oracle check and proofs are implemented
-    proxy.secret_rotation().await?;
+    proxy
+        .secret_rotation(salted_identifier, new_commitment, &proofs)
+        .await?;
     tracing::trace!("proof verification for rotation succeeded - rotating secret now");
     db.rotate_commitment(salted_identifier, new_commitment)
         .await?;
@@ -56,12 +58,12 @@ async fn registration(
     Json(RegistrationRequest {
         salted_identifier,
         commitment,
-        proofs: _,
+        proofs,
     }): Json<RegistrationRequest>,
 ) -> ApiResult<()> {
-    // TODO: unauthenticated until the oracle check and proofs are implemented. Verify both
-    // the OPRF proof and the passport proof.
-    proxy.registration_commitment().await?;
+    proxy
+        .registration_commitment(salted_identifier, commitment, &proofs)
+        .await?;
     tracing::trace!("proof verification for registration succeeded - storing identifier now");
     db.insert_registration(salted_identifier, commitment)
         .await?;

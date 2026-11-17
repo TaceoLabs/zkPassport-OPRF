@@ -17,10 +17,12 @@ ark-ff.workspace = true
 serde_json.workspace = true
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
 
+reqwest = { workspace = true, optional = true }
 # container harness (feature-gated)
 testcontainers = { workspace = true, optional = true }
-reqwest = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true, features = ["sync"] }
+tokio = { workspace = true, features = ["sync"], optional = true }
 
 [features]
-containers = ["dep:testcontainers", "dep:reqwest", "dep:tokio"]
+containers = ["dep:reqwest", "dep:testcontainers", "dep:tokio"]
+
+[lints]

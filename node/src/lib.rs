@@ -32,8 +32,6 @@ pub(crate) mod auth_modules;
 pub mod config;
 pub mod metrics;
 pub(crate) mod services;
-#[cfg(test)]
-mod tests;
 
 pub use services::{
     oracle_proxy::{

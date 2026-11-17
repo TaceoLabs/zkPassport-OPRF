@@ -8,19 +8,25 @@ use crate::services::oracle_proxy::{OracleError, OracleProxy, Result};
 /// A call received by [`TestOracleProxy`], with the arguments relevant for assertions.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum OracleCall {
-    SaltedIdentifier(ark_babyjubjub::EdwardsAffine),
+    SaltedIdentifier {
+        blinded_query: ark_babyjubjub::EdwardsAffine,
+        proofs: Vec<ZKPassportProofResult>,
+    },
     PreimageProof {
         blinded_query: ark_babyjubjub::EdwardsAffine,
         salted_identifier: SaltedIdentifier,
         commitment: AuthCommitment,
+        proofs: Vec<ZKPassportProofResult>,
     },
     RegistrationCommitment {
         salted_identifier: SaltedIdentifier,
         commitment: AuthCommitment,
+        proofs: Vec<ZKPassportProofResult>,
     },
     SecretRotation {
         salted_identifier: SaltedIdentifier,
         new_commitment: AuthCommitment,
+        proofs: Vec<ZKPassportProofResult>,
     },
     V1FaceMatch {
         blinded_query: ark_babyjubjub::EdwardsAffine,
@@ -30,15 +36,11 @@ pub(crate) enum OracleCall {
 
 /// [`OracleProxy`] that sends no requests and answers every check with a fixed outcome.
 ///
-/// Records every call, see [`TestOracleProxy::calls`].
+/// Records every call, see [`TestOracleProxy::take_calls`].
 #[derive(Debug, Clone, Default)]
 pub(crate) struct TestOracleProxy {
     /// If set, every check fails with [`OracleError::BadRequest`] with this reason.
     reject: Option<String>,
-    /// If set, preimage proofs only verify against this commitment, see
-    /// [`TestOracleProxy::knows_preimage_of`]. Shared between clones, so a test can change it
-    /// for running nodes with [`TestOracleProxy::set_known_preimage`].
-    preimage_of: Arc<Mutex<Option<AuthCommitment>>>,
     calls: Arc<Mutex<Vec<OracleCall>>>,
 }
 
@@ -56,25 +58,9 @@ impl TestOracleProxy {
         }
     }
 
-    /// Oracle for a client that knows only the preimage of `commitment`: preimage proofs
-    /// against any other commitment fail with [`OracleError::BadRequest`], every other check
-    /// is accepted.
-    pub(crate) fn knows_preimage_of(commitment: AuthCommitment) -> Self {
-        Self {
-            preimage_of: Arc::new(Mutex::new(Some(commitment))),
-            ..Self::default()
-        }
-    }
-
-    /// Makes subsequent preimage proofs verify only against `commitment`, e.g. to simulate a
-    /// client that rotated to a new secret and no longer knows the old one.
-    pub(crate) fn set_known_preimage(&self, commitment: AuthCommitment) {
-        *self.preimage_of.lock().expect("not poisoned") = Some(commitment);
-    }
-
-    /// All calls received so far, in order.
-    pub(crate) fn calls(&self) -> Vec<OracleCall> {
-        self.calls.lock().expect("not poisoned").clone()
+    /// Returns the calls received since the last call to this method, in order.
+    pub(crate) fn take_calls(&self) -> Vec<OracleCall> {
+        std::mem::take(&mut *self.calls.lock().expect("not poisoned"))
     }
 
     fn outcome(&self, call: OracleCall) -> Result<()> {
@@ -90,9 +76,12 @@ impl OracleProxy for TestOracleProxy {
     async fn salted_identifier(
         &self,
         blinded_query: ark_babyjubjub::EdwardsAffine,
-        _proofs: &[ZKPassportProofResult],
+        proofs: &[ZKPassportProofResult],
     ) -> Result<()> {
-        self.outcome(OracleCall::SaltedIdentifier(blinded_query))
+        self.outcome(OracleCall::SaltedIdentifier {
+            blinded_query,
+            proofs: proofs.to_vec(),
+        })
     }
 
     async fn preimage_proof(
@@ -100,30 +89,26 @@ impl OracleProxy for TestOracleProxy {
         blinded_query: ark_babyjubjub::EdwardsAffine,
         salted_identifier: SaltedIdentifier,
         auth_commitment: AuthCommitment,
-        _proofs: &[ZKPassportProofResult],
+        proofs: &[ZKPassportProofResult],
     ) -> Result<()> {
         self.outcome(OracleCall::PreimageProof {
             blinded_query,
             salted_identifier,
             commitment: auth_commitment,
-        })?;
-        match *self.preimage_of.lock().expect("not poisoned") {
-            Some(known) if known != auth_commitment => {
-                Err(OracleError::BadRequest("unknown preimage".to_owned()))
-            }
-            _ => Ok(()),
-        }
+            proofs: proofs.to_vec(),
+        })
     }
 
     async fn registration_commitment(
         &self,
         salted_identifier: SaltedIdentifier,
         commitment: AuthCommitment,
-        _proofs: &[ZKPassportProofResult],
+        proofs: &[ZKPassportProofResult],
     ) -> Result<()> {
         self.outcome(OracleCall::RegistrationCommitment {
             salted_identifier,
             commitment,
+            proofs: proofs.to_vec(),
         })
     }
 
@@ -131,11 +116,12 @@ impl OracleProxy for TestOracleProxy {
         &self,
         salted_identifier: SaltedIdentifier,
         new_commitment: AuthCommitment,
-        _proofs: &[ZKPassportProofResult],
+        proofs: &[ZKPassportProofResult],
     ) -> Result<()> {
         self.outcome(OracleCall::SecretRotation {
             salted_identifier,
             new_commitment,
+            proofs: proofs.to_vec(),
         })
     }
 

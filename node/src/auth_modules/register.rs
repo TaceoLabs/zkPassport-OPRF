@@ -8,7 +8,10 @@ use zkpassport_oprf_authentication::{
     AuthErrorKind, RegisterRequestAuth, registration_oprf_key_id,
 };
 
-use crate::services::oracle_proxy::{OracleError, OracleProxyService};
+use crate::{
+    metrics,
+    services::oracle_proxy::{OracleError, OracleProxyService},
+};
 
 /// Authenticator for passport registration.
 ///
@@ -38,11 +41,14 @@ impl OprfRequestAuthenticator for RegisterAuthenticator {
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
+        metrics::auth_module::inc_register();
+        tracing::trace!("handling salted identifier request");
         self.proxy
             .salted_identifier(request.blinded_query, &request.auth.proofs)
             .await
             .inspect_err(OracleError::log)
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))?;
+        tracing::trace!("oracle accepted the identify proofs");
         Ok(registration_oprf_key_id())
     }
 }

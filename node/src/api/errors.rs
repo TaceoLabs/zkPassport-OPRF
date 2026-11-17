@@ -51,8 +51,22 @@ impl From<DbError> for ApiError {
     }
 }
 
+impl ApiError {
+    fn log(&self) {
+        match self {
+            Self::UnknownIdentifier
+            | Self::AlreadyRegistered
+            | Self::CommitmentPreviouslyUsed
+            | Self::BadRequest(_) => tracing::warn!(err = ?self, auth_error = true, "{self}"),
+            Self::OracleUnavailable => tracing::error!(err = ?self, "{self}"),
+            Self::Internal(report) => tracing::error!(err = ?report, "internal error"),
+        }
+    }
+}
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        self.log();
         let (status, message) = match &self {
             Self::BadRequest(_) => (StatusCode::BAD_REQUEST, self.to_string()),
             Self::UnknownIdentifier => (StatusCode::NOT_FOUND, self.to_string()),
@@ -60,13 +74,10 @@ impl IntoResponse for ApiError {
                 (StatusCode::CONFLICT, self.to_string())
             }
             Self::OracleUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
-            Self::Internal(report) => {
-                tracing::error!(err = ?report, "internal error");
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "internal server error".to_owned(),
-                )
-            }
+            Self::Internal(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal server error".to_owned(),
+            ),
         };
         (status, Json(json!({ "error": message }))).into_response()
     }

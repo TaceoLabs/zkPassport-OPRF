@@ -63,7 +63,7 @@ impl ZkPassportDb {
     /// Returns an error if the connection to the database fails.
     #[instrument(level = "debug", skip_all)]
     pub async fn init(config: &PostgresConfig) -> eyre::Result<Self> {
-        tracing::debug!("init PgPool with schema: {}", config.schema);
+        tracing::info!("init PgPool with schema: {}", config.schema);
         let pool = taceo_nodes_common::postgres::pg_pool_with_schema(config, CreateSchema::Yes)
             .await
             .context("while connecting to postgres DB")?;
@@ -88,12 +88,10 @@ impl ZkPassportDb {
     /// Both inserts happen in a single statement, so of two concurrent registrations for the
     /// same `identifier` only one is stored, and a rejected registration writes nothing.
     ///
-    /// Registering `identifier` with its current commitment is a no-op that succeeds, which
-    /// makes retries after a lost reply and duplicate submissions safe.
-    ///
     /// # Errors
-    /// Returns [`DbError::AlreadyRegistered`] if `identifier` is already registered with
-    /// another commitment.
+    /// Returns [`DbError::AlreadyRegistered`] if `identifier` is already registered, with any
+    /// commitment.
+    #[instrument(level = "debug", skip_all)]
     pub(crate) async fn insert_registration(
         &self,
         identifier: SaltedIdentifier,
@@ -117,24 +115,9 @@ impl ZkPassportDb {
             .bind(commitment.as_slice())
             .execute(&self.pool)
             .await?;
-            if inserted.rows_affected() > 0 {
-                return Ok(());
-            }
-            // A separate statement, so it sees a registration committed concurrently with the
-            // insert above.
-            let current: Option<Vec<u8>> = sqlx::query_scalar(
-                "SELECT commitment FROM passport_registrations WHERE salted_identifier = $1",
-            )
-            .bind(identifier.as_slice())
-            .fetch_optional(&self.pool)
-            .await?;
-            let current = current
-                .ok_or_else(|| eyre::eyre!("registration vanished after conflicting insert"))?;
-            if current != commitment.as_slice() {
+            if inserted.rows_affected() == 0 {
                 return Err(DbError::AlreadyRegistered);
             }
-            // a retry or duplicate submission of this registration - nothing to do
-            tracing::debug!("identifier is already registered with this commitment");
             Ok(())
         };
         self.with_retry("insert_registration", register).await
@@ -143,15 +126,16 @@ impl ZkPassportDb {
     /// Replaces the commitment stored for `identifier` and appends it to its commitment history.
     ///
     /// A commitment can be used at most once per `identifier`, which prevents a replayed
-    /// rotation from restoring an earlier commitment. Rotating to the current commitment is a
-    /// no-op that succeeds, which makes retries and duplicate submissions safe.
+    /// rotation from restoring an earlier commitment, including the current one.
     ///
     /// Runs in a transaction that locks the registration of `identifier`, so concurrent
     /// rotations for the same `identifier` are serialized.
     ///
     /// # Errors
     /// Returns [`DbError::UnknownIdentifier`] if no entry exists for `identifier`, and
-    /// [`DbError::CommitmentPreviouslyUsed`] if `commitment` was previously stored for `identifier`.
+    /// [`DbError::CommitmentPreviouslyUsed`] if `commitment` was previously stored for `identifier`,
+    /// which includes its current commitment.
+    #[instrument(level = "debug", skip_all)]
     pub(crate) async fn rotate_commitment(
         &self,
         identifier: SaltedIdentifier,
@@ -163,18 +147,13 @@ impl ZkPassportDb {
             taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment);
         let rotate_transaction = || async {
             let mut tx = self.pool.begin().await?;
-            let current: Option<Vec<u8>> = sqlx::query_scalar(
+            sqlx::query_scalar::<_, Vec<u8>>(
                 "SELECT commitment FROM passport_registrations WHERE salted_identifier = $1 FOR UPDATE",
             )
             .bind(identifier.as_slice())
             .fetch_optional(&mut *tx)
-            .await?;
-            let current = current.ok_or(DbError::UnknownIdentifier)?;
-            if current == commitment.as_slice() {
-                // a retry or duplicate submission of the latest rotation - nothing to do
-                tracing::debug!("commitment is already current - nothing to rotate");
-                return Ok(());
-            }
+            .await?
+            .ok_or(DbError::UnknownIdentifier)?;
             let inserted = sqlx::query(
                 "INSERT INTO commitment_history (salted_identifier, commitment) VALUES ($1, $2) ON CONFLICT (salted_identifier, commitment) DO NOTHING",
             )
@@ -203,6 +182,7 @@ impl ZkPassportDb {
     ///
     /// # Errors
     /// Returns [`DbError::UnknownIdentifier`] if no entry exists for `identifier`.
+    #[instrument(level = "debug", skip_all)]
     pub(crate) async fn fetch_commitment(
         &self,
         identifier: SaltedIdentifier,
@@ -354,11 +334,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn register_same_commitment_is_idempotent() -> eyre::Result<()> {
+    async fn register_same_commitment_rejected() -> eyre::Result<()> {
         let (_pg, db) = ZkPassportDb::init_test().await?;
         let (id, c1) = (identifier(1), commitment(1));
         db.insert_registration(id, c1).await?;
-        db.insert_registration(id, c1).await?;
+        let err = db
+            .insert_registration(id, c1)
+            .await
+            .expect_err("should fail");
+        assert!(matches!(err, DbError::AlreadyRegistered));
         assert_eq!(history(&db, id).await, vec![c1]);
         Ok(())
     }
@@ -399,8 +383,9 @@ mod tests {
         db.rotate_commitment(id, c2).await?;
         assert_eq!(db.fetch_commitment(id).await?, c2);
         assert_eq!(history(&db, id).await, sorted(vec![c1, c2]));
-        // rotating to the current commitment is a no-op
-        db.rotate_commitment(id, c2).await?;
+        // rotating to the current commitment is rejected like any previously used commitment
+        let err = db.rotate_commitment(id, c2).await.expect_err("should fail");
+        assert!(matches!(err, DbError::CommitmentPreviouslyUsed));
         assert_eq!(history(&db, id).await, sorted(vec![c1, c2]));
         Ok(())
     }
@@ -474,25 +459,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn concurrent_identical_registrations_all_succeed() -> eyre::Result<()> {
-        let (_pg, db) = ZkPassportDb::init_test().await?;
-        let (id, c1) = (identifier(1), commitment(1));
-        let handles: Vec<_> = (0..8)
-            .map(|_| {
-                let db = db.clone();
-                tokio::spawn(async move { db.insert_registration(id, c1).await })
-            })
-            .collect();
-        for h in handles {
-            h.await??;
-        }
-        assert_eq!(db.fetch_commitment(id).await?, c1);
-        assert_eq!(history(&db, id).await, vec![c1]);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn concurrent_identical_rotations_all_succeed() -> eyre::Result<()> {
+    async fn concurrent_identical_rotations_apply_once() -> eyre::Result<()> {
         let (_pg, db) = ZkPassportDb::init_test().await?;
         let (id, c1, c2) = (identifier(1), commitment(1), commitment(2));
         db.insert_registration(id, c1).await?;
@@ -502,9 +469,14 @@ mod tests {
                 tokio::spawn(async move { db.rotate_commitment(id, c2).await })
             })
             .collect();
+        let mut ok = 0;
         for h in handles {
-            h.await??;
+            match h.await? {
+                Ok(()) => ok += 1,
+                Err(e) => assert!(matches!(e, DbError::CommitmentPreviouslyUsed)),
+            }
         }
+        assert_eq!(ok, 1);
         assert_eq!(db.fetch_commitment(id).await?, c2);
         assert_eq!(history(&db, id).await, sorted(vec![c1, c2]));
         Ok(())

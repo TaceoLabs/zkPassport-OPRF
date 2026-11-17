@@ -7,7 +7,7 @@ use tracing::instrument;
 use zkpassport_oprf_authentication::{AuthErrorKind, NullifierRequestAuth};
 
 use crate::{
-    ZkPassportDb,
+    ZkPassportDb, metrics,
     services::{
         oracle_proxy::{OracleError, OracleProxyService},
         postgres::DbError,
@@ -65,6 +65,7 @@ impl NullifierAuthenticator {
         &self,
         request: &OprfRequest<NullifierRequestAuth>,
     ) -> Result<OprfKeyId, NullifierAuthenticatorError> {
+        tracing::trace!("handling nullifier request");
         let OprfRequest {
             request_id: _,
             blinded_query,
@@ -74,6 +75,7 @@ impl NullifierAuthenticator {
             return Err(NullifierAuthenticatorError::RequestedOprfRegistrationKey);
         }
         let auth_commitment = self.db.fetch_commitment(auth.salted_identifier).await?;
+        tracing::trace!("fetched stored commitment - verifying proofs with oracle");
         self.proxy
             .preimage_proof(
                 *blinded_query,
@@ -82,6 +84,7 @@ impl NullifierAuthenticator {
                 &auth.proofs,
             )
             .await?;
+        tracing::trace!("oracle accepted the nullifier proofs");
         Ok(auth.oprf_key_id)
     }
 }
@@ -95,6 +98,7 @@ impl OprfRequestAuthenticator for NullifierAuthenticator {
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
+        metrics::auth_module::inc_nullifier();
         self.authenticate_inner(request)
             .await
             .inspect_err(NullifierAuthenticatorError::log)

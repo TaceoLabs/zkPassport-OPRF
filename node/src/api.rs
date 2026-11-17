@@ -7,7 +7,9 @@ use telemetry_batteries::{opentelemetry, tracing::middleware::TraceLayer};
 use tracing::instrument;
 use zkpassport_oprf_authentication::{CommitmentRotationRequest, RegistrationRequest};
 
-use crate::{ZkPassportDb, api::errors::ApiError, services::oracle_proxy::OracleProxyService};
+use crate::{
+    ZkPassportDb, api::errors::ApiError, metrics, services::oracle_proxy::OracleProxyService,
+};
 
 pub(crate) mod errors;
 
@@ -41,12 +43,14 @@ async fn rotation(
         proofs,
     }): Json<CommitmentRotationRequest>,
 ) -> ApiResult<()> {
+    tracing::trace!("handling rotation request");
     proxy
         .secret_rotation(salted_identifier, new_commitment, &proofs)
         .await?;
     tracing::trace!("proof verification for rotation succeeded - rotating secret now");
     db.rotate_commitment(salted_identifier, new_commitment)
         .await?;
+    metrics::api::inc_rotations();
     tracing::trace!("successfully rotated secret");
     Ok(())
 }
@@ -61,12 +65,14 @@ async fn registration(
         proofs,
     }): Json<RegistrationRequest>,
 ) -> ApiResult<()> {
+    tracing::trace!("handling registration request");
     proxy
         .registration_commitment(salted_identifier, commitment, &proofs)
         .await?;
     tracing::trace!("proof verification for registration succeeded - storing identifier now");
     db.insert_registration(salted_identifier, commitment)
         .await?;
+    metrics::api::inc_registrations();
     tracing::trace!("successfully registered identifier");
     Ok(())
 }

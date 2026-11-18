@@ -19,7 +19,7 @@ async fn v2_flow() -> eyre::Result<()> {
     let node = TestNode::start().await?;
     let proofs = serde_json::to_value(proofs())?;
 
-    let output = node.register_oprf(PN).await?;
+    let output = node.identify_oprf(PN).await?;
     let id = SaltedIdentifier::from(output.unblinded_response);
     let id_json = serde_json::to_value(id)?;
     assert_eq!(
@@ -140,7 +140,7 @@ async fn verifier_rejects_proofs() -> eyre::Result<()> {
     let id = SaltedIdentifier::from(EdwardsAffine::default());
 
     node.verifier.reject("invalid proof");
-    let err = service_error(node.register_oprf(PN).await);
+    let err = service_error(node.identify_oprf(PN).await);
     assert_eq!(err.error_code, error_codes::ORACLE_BAD_REQUEST);
     assert_eq!(err.msg.as_deref(), Some("invalid proof"));
     assert_eq!(
@@ -183,7 +183,7 @@ async fn verifier_fails() -> eyre::Result<()> {
         json!({ "error": "boom" }),
     );
 
-    let err = service_error(node.register_oprf(PN).await);
+    let err = service_error(node.identify_oprf(PN).await);
     assert_eq!(err.error_code, error_codes::INTERNAL);
     let id = SaltedIdentifier::from(EdwardsAffine::default());
     assert_eq!(
@@ -197,7 +197,7 @@ async fn verifier_fails() -> eyre::Result<()> {
 async fn verifier_down() -> eyre::Result<()> {
     let node = TestNode::start_with_verifier_down().await?;
 
-    let err = service_error(node.register_oprf(PN).await);
+    let err = service_error(node.identify_oprf(PN).await);
     assert_eq!(err.error_code, error_codes::ORACLE_NOT_REACHABLE);
     let id = SaltedIdentifier::from(EdwardsAffine::default());
     assert_eq!(

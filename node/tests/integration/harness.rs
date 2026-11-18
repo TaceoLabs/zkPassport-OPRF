@@ -41,7 +41,7 @@ use taceo_oprf::{
 use taceo_zkpassport_oprf_node::{ProofVerifierOracle, ZkPassportDb, config::RetryLayerConfig};
 use zkpassport_oprf_authentication::{
     AuthCommitment, AuthModules, CommitmentRotationRequest, FaceMatchRequestAuth,
-    NullifierRequestAuth, RegisterRequestAuth, RegistrationRequest, SaltedIdentifier,
+    IdentifyRequestAuth, NullifierRequestAuth, RegistrationRequest, SaltedIdentifier,
     ZKPassportProofResult, registration_oprf_key_id,
 };
 
@@ -158,11 +158,11 @@ impl TestNode {
     }
 
     /// First registration step: evaluates `pn` under the registration key.
-    pub(crate) async fn register_oprf(&self, pn: u64) -> Result<VerifiableOprfOutput, Error> {
+    pub(crate) async fn identify_oprf(&self, pn: u64) -> Result<VerifiableOprfOutput, Error> {
         self.oprf(
-            AuthModules::Register,
+            AuthModules::Identify,
             pn,
-            RegisterRequestAuth::new(proofs()),
+            IdentifyRequestAuth::new(proofs()),
         )
         .await
     }

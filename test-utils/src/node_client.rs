@@ -13,8 +13,8 @@ use taceo_oprf::{
 };
 use uuid::Uuid;
 use zkpassport_oprf_authentication::{
-    AuthModules, CommitmentRotationRequest, FaceMatchRequestAuth, NullifierRequestAuth,
-    RegisterRequestAuth, RegistrationRequest,
+    AuthModules, CommitmentRotationRequest, FaceMatchRequestAuth, IdentifyRequestAuth,
+    NullifierRequestAuth, RegistrationRequest,
 };
 
 use crate::fixtures::{CommitmentFixture, IdentifyFixture, QueryFixture, load_fixture_data};
@@ -33,7 +33,7 @@ impl NodeClient {
     ///
     /// Needs the default rustls crypto provider to be installed.
     pub fn new(nodes: Vec<String>, threshold: NonZeroUsize) -> eyre::Result<Self> {
-        to_oprf_uri_many(&nodes, AuthModules::Register).context("invalid node URL")?;
+        to_oprf_uri_many(&nodes, AuthModules::Identify).context("invalid node URL")?;
         eyre::ensure!(
             nodes.len() >= threshold.get(),
             "threshold must be between 1 and the number of nodes"
@@ -48,8 +48,8 @@ impl NodeClient {
 
     /// OPRF evaluation of the registration key for `fixture`.
     pub async fn identify(&self, fixture: &IdentifyFixture) -> Result<(), Error> {
-        let auth = RegisterRequestAuth::new(fixture.proofs.clone());
-        self.oprf(AuthModules::Register, fixture.blinded_query, auth)
+        let auth = IdentifyRequestAuth::new(fixture.proofs.clone());
+        self.oprf(AuthModules::Identify, fixture.blinded_query, auth)
             .await
     }
 

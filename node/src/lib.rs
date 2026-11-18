@@ -5,7 +5,7 @@
 //! 1. Initializes the authentication modules, which verify zkPassport proofs
 //!    through the given [`OracleProxy`].
 //! 2. Builds an [`OprfServiceBuilder`](taceo_oprf::service::OprfServiceBuilder)
-//!    and registers the face-match and register authentication modules.
+//!    and registers the face-match, identify and nullifier authentication modules.
 //! 3. Nests the HTTP API (`/api`, e.g. commitment rotation backed by the
 //!    passport registrations DB) next to the OPRF routes.
 //!
@@ -23,8 +23,8 @@ use taceo_oprf::{
 use zkpassport_oprf_authentication::AuthModules;
 
 use crate::auth_modules::{
-    face_match::FaceMatchAuthenticator, nullifier::NullifierAuthenticator,
-    register::RegisterAuthenticator,
+    face_match::FaceMatchAuthenticator, identify::IdentifyAuthenticator,
+    nullifier::NullifierAuthenticator,
 };
 
 pub(crate) mod api;
@@ -61,7 +61,7 @@ pub fn start(
     version_str: String,
 ) -> Router {
     let face_match_auth_service = Arc::new(FaceMatchAuthenticator::init(oracle_proxy.clone()));
-    let register_auth_service = Arc::new(RegisterAuthenticator::init(oracle_proxy.clone()));
+    let identify_auth_service = Arc::new(IdentifyAuthenticator::init(oracle_proxy.clone()));
     let nullifier_auth_service = Arc::new(NullifierAuthenticator::init(
         oracle_proxy.clone(),
         zkpassport_db.clone(),
@@ -81,8 +81,8 @@ pub fn start(
         face_match_auth_service,
     )
     .module(
-        &format!("/{}", AuthModules::Register),
-        register_auth_service,
+        &format!("/{}", AuthModules::Identify),
+        identify_auth_service,
     )
     .module(
         &format!("/{}", AuthModules::Nullifier),

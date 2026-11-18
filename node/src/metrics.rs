@@ -24,7 +24,7 @@ pub(crate) mod auth_module {
     const METRICS_ID_AUTHENTICATION_COUNTER: &str = oprf_metrics_key_zkpassport!("auth");
     const METRICS_ATTRID_AUTH_MODULE: &str = "auth_module";
     const METRICS_ATTR_FACE_MATCH_MODULE: &str = "face_match";
-    const METRICS_ATTR_REGISTER_MODULE: &str = "register";
+    const METRICS_ATTR_IDENTIFY_MODULE: &str = "identify";
     const METRICS_ATTR_NULLIFIER_MODULE: &str = "nullifier";
 
     pub(super) fn describe_metrics() {
@@ -39,8 +39,8 @@ pub(crate) mod auth_module {
         metrics::counter!(METRICS_ID_AUTHENTICATION_COUNTER, METRICS_ATTRID_AUTH_MODULE => METRICS_ATTR_FACE_MATCH_MODULE).increment(1);
     }
 
-    pub(crate) fn inc_register() {
-        metrics::counter!(METRICS_ID_AUTHENTICATION_COUNTER, METRICS_ATTRID_AUTH_MODULE => METRICS_ATTR_REGISTER_MODULE).increment(1);
+    pub(crate) fn inc_identify() {
+        metrics::counter!(METRICS_ID_AUTHENTICATION_COUNTER, METRICS_ATTRID_AUTH_MODULE => METRICS_ATTR_IDENTIFY_MODULE).increment(1);
     }
 
     pub(crate) fn inc_nullifier() {

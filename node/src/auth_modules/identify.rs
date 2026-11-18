@@ -5,7 +5,7 @@ use taceo_oprf::types::{
 };
 use tracing::instrument;
 use zkpassport_oprf_authentication::{
-    AuthErrorKind, RegisterRequestAuth, registration_oprf_key_id,
+    AuthErrorKind, IdentifyRequestAuth, registration_oprf_key_id,
 };
 
 use crate::{
@@ -18,12 +18,12 @@ use crate::{
 /// Always evaluates under the global [`registration_oprf_key_id`] (the client cannot
 /// choose the key) and verifies the zkPassport proofs through the oracle. Implements
 /// [`OprfRequestAuthenticator`] and is registered on the OPRF service builder for the
-/// `/register` authentication module.
-pub struct RegisterAuthenticator {
+/// `/identify` authentication module.
+pub struct IdentifyAuthenticator {
     proxy: OracleProxyService,
 }
 
-impl RegisterAuthenticator {
+impl IdentifyAuthenticator {
     /// Initialize the authenticator.
     ///
     /// Stores the oracle proxy used for subsequent proof-verification requests.
@@ -33,15 +33,15 @@ impl RegisterAuthenticator {
 }
 
 #[async_trait]
-impl OprfRequestAuthenticator for RegisterAuthenticator {
-    type RequestAuth = RegisterRequestAuth;
+impl OprfRequestAuthenticator for IdentifyAuthenticator {
+    type RequestAuth = IdentifyRequestAuth;
 
     #[instrument(level = "info", skip_all)]
     async fn authenticate(
         &self,
         request: &OprfRequest<Self::RequestAuth>,
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
-        metrics::auth_module::inc_register();
+        metrics::auth_module::inc_identify();
         tracing::trace!("handling salted identifier request");
         self.proxy
             .salted_identifier(request.blinded_query, &request.auth.proofs)
@@ -63,16 +63,16 @@ mod tests {
     };
     use uuid::Uuid;
     use zkpassport_oprf_authentication::{
-        RegisterRequestAuth, error_codes, registration_oprf_key_id,
+        IdentifyRequestAuth, error_codes, registration_oprf_key_id,
     };
     use zkpassport_oprf_test_utils::fixtures::FixtureData;
 
     use crate::{
-        auth_modules::register::RegisterAuthenticator,
+        auth_modules::identify::IdentifyAuthenticator,
         services::oracle_proxy::test::{OracleCall, TestOracleProxy},
     };
 
-    fn build_request(fixture: FixtureData) -> OprfRequest<RegisterRequestAuth> {
+    fn build_request(fixture: FixtureData) -> OprfRequest<IdentifyRequestAuth> {
         let blinding_factor =
             BlindingFactor::from_scalar(fixture.beta).expect("Invalid blinding factor");
         let blinded_query =
@@ -80,7 +80,7 @@ mod tests {
         OprfRequest {
             request_id: Uuid::new_v4(),
             blinded_query: blinded_query.blinded_query(),
-            auth: RegisterRequestAuth::new(fixture.proofs),
+            auth: IdentifyRequestAuth::new(fixture.proofs),
         }
     }
 
@@ -89,7 +89,7 @@ mod tests {
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);
         let oracle = Arc::new(TestOracleProxy::accept());
-        let auth_service = RegisterAuthenticator::init(oracle.clone());
+        let auth_service = IdentifyAuthenticator::init(oracle.clone());
         let oprf_key = auth_service.authenticate(&request).await?;
         assert_eq!(oprf_key, registration_oprf_key_id());
         assert_eq!(
@@ -107,7 +107,7 @@ mod tests {
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
         let request = build_request(fixture);
         let auth_service =
-            RegisterAuthenticator::init(Arc::new(TestOracleProxy::reject("invalid proof")));
+            IdentifyAuthenticator::init(Arc::new(TestOracleProxy::reject("invalid proof")));
         let is_err = auth_service
             .authenticate(&request)
             .await

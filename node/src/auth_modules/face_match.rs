@@ -4,7 +4,9 @@ use taceo_oprf::types::{
     async_trait::async_trait,
 };
 use tracing::instrument;
-use zkpassport_oprf_authentication::{AuthErrorKind, FaceMatchRequestAuth};
+use zkpassport_oprf_authentication::{
+    AuthErrorKind, FaceMatchRequestAuth, registration_oprf_key_id,
+};
 
 use crate::{
     metrics,
@@ -39,6 +41,13 @@ impl OprfRequestAuthenticator for FaceMatchAuthenticator {
     ) -> Result<OprfKeyId, OprfRequestAuthenticatorError> {
         metrics::auth_module::inc_face_match();
         tracing::trace!("handling v1 face-match");
+        if request.auth.oprf_key_id == registration_oprf_key_id() {
+            tracing::warn!(
+                auth_error = true,
+                "cannot request face-match for registration OPRF-key"
+            );
+            return Err(AuthErrorKind::RequestedOprfRegistrationKey.into());
+        }
         self.proxy
             .v1_face_match(request.blinded_query, &request.auth.proofs)
             .await
@@ -62,7 +71,9 @@ mod tests {
         },
     };
     use uuid::Uuid;
-    use zkpassport_oprf_authentication::{FaceMatchRequestAuth, error_codes};
+    use zkpassport_oprf_authentication::{
+        FaceMatchRequestAuth, error_codes, registration_oprf_key_id,
+    };
     use zkpassport_oprf_test_utils::fixtures::FixtureData;
 
     use crate::{
@@ -70,7 +81,10 @@ mod tests {
         services::oracle_proxy::test::{OracleCall, TestOracleProxy},
     };
 
-    fn build_request(fixture: FixtureData) -> OprfRequest<FaceMatchRequestAuth> {
+    fn build_request(
+        fixture: FixtureData,
+        oprf_key_id: OprfKeyId,
+    ) -> OprfRequest<FaceMatchRequestAuth> {
         let blinding_factor =
             BlindingFactor::from_scalar(fixture.beta).expect("Invalid blinding factor");
         let blinded_query =
@@ -78,18 +92,22 @@ mod tests {
         OprfRequest {
             request_id: Uuid::new_v4(),
             blinded_query: blinded_query.blinded_query(),
-            auth: FaceMatchRequestAuth::new(OprfKeyId::new(U160::from(1)), fixture.proofs),
+            auth: FaceMatchRequestAuth::new(oprf_key_id, fixture.proofs),
         }
+    }
+
+    fn customer_key_id() -> OprfKeyId {
+        OprfKeyId::new(U160::from(2))
     }
 
     #[tokio::test]
     async fn success_test() -> eyre::Result<()> {
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
-        let request = build_request(fixture);
+        let request = build_request(fixture, customer_key_id());
         let oracle = Arc::new(TestOracleProxy::accept());
         let auth_service = FaceMatchAuthenticator::init(oracle.clone());
         let oprf_key = auth_service.authenticate(&request).await?;
-        assert_eq!(oprf_key.into_inner(), 1);
+        assert_eq!(oprf_key, customer_key_id());
         // the oracle verifies the proofs against the blinded query of this request
         assert_eq!(
             oracle.take_calls(),
@@ -102,9 +120,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn registration_key_rejected_test() -> eyre::Result<()> {
+        let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
+        let request = build_request(fixture, registration_oprf_key_id());
+        let oracle = Arc::new(TestOracleProxy::accept());
+        let auth_service = FaceMatchAuthenticator::init(oracle.clone());
+        let is_err = auth_service
+            .authenticate(&request)
+            .await
+            .expect_err("Should fail");
+        assert_eq!(is_err.code(), error_codes::REQUESTED_OPRF_REGISTRATION_KEY);
+        assert_eq!(oracle.take_calls(), vec![]);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn oracle_rejects_test() -> eyre::Result<()> {
         let fixture = zkpassport_oprf_test_utils::fixtures::load_fixture_data();
-        let request = build_request(fixture);
+        let request = build_request(fixture, customer_key_id());
         let auth_service =
             FaceMatchAuthenticator::init(Arc::new(TestOracleProxy::reject("invalid proof")));
         let is_err = auth_service

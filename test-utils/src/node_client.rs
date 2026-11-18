@@ -1,6 +1,6 @@
 //! Requests to a set of OPRF nodes: OPRF evaluations over websocket and the HTTP API.
 
-use std::{num::NonZeroUsize, sync::Arc};
+use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 use eyre::Context as _;
 use reqwest::StatusCode;
@@ -19,6 +19,8 @@ use zkpassport_oprf_authentication::{
 
 use crate::fixtures::{CommitmentFixture, IdentifyFixture, QueryFixture, load_fixture_data};
 
+const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Client for a set of OPRF nodes.
 pub struct NodeClient {
     nodes: Vec<String>,
@@ -33,6 +35,10 @@ impl NodeClient {
     ///
     /// Needs the default rustls crypto provider to be installed.
     pub fn new(nodes: Vec<String>, threshold: NonZeroUsize) -> eyre::Result<Self> {
+        let nodes: Vec<String> = nodes
+            .iter()
+            .map(|node| node.trim_end_matches('/').to_owned())
+            .collect();
         to_oprf_uri_many(&nodes, AuthModules::Identify).context("invalid node URL")?;
         eyre::ensure!(
             nodes.len() >= threshold.get(),
@@ -42,7 +48,10 @@ impl NodeClient {
             nodes,
             threshold,
             connector: tls_connector(),
-            http: reqwest::Client::new(),
+            http: reqwest::Client::builder()
+                .timeout(HTTP_TIMEOUT)
+                .build()
+                .context("while building the HTTP client")?,
         })
     }
 

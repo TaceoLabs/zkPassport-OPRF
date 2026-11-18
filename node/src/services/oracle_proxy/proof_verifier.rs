@@ -144,8 +144,7 @@ impl ProofVerifierOracle {
     #[instrument(level = "info", skip_all)]
     async fn post(&self, url: &Url, body: &impl Serialize) -> Result<()> {
         tracing::trace!("sending verify request to oracle: {url}");
-        let start = Instant::now();
-        let result = (|| async {
+        (|| async {
             let response = self.client.post(url.clone()).json(body).send().await?;
             let status = response.status();
             if status == StatusCode::OK {
@@ -175,9 +174,7 @@ impl ProofVerifierOracle {
             metrics::oracle::inc_retries();
             tracing::warn!(%err, retry_in = ?duration, "retrying request to {url}");
         })
-        .await;
-        metrics::oracle::record_duration(start.elapsed());
-        result
+        .await
     }
 }
 
@@ -192,7 +189,10 @@ impl OracleProxy for ProofVerifierOracle {
             proofs,
             blinded_query: HexPoint(blinded_query),
         };
-        self.post(&self.endpoints.identify, &request).await
+        let start = Instant::now();
+        let result = self.post(&self.endpoints.identify, &request).await;
+        metrics::oracle::record_identify_duration(start.elapsed());
+        result
     }
 
     async fn registration_commitment(
@@ -206,7 +206,10 @@ impl OracleProxy for ProofVerifierOracle {
             salted_identifier,
             commitment,
         };
-        self.post(&self.endpoints.register, &request).await
+        let start = Instant::now();
+        let result = self.post(&self.endpoints.register, &request).await;
+        metrics::oracle::record_register_duration(start.elapsed());
+        result
     }
 
     async fn preimage_proof(
@@ -222,7 +225,10 @@ impl OracleProxy for ProofVerifierOracle {
             salted_identifier,
             commitment: auth_commitment,
         };
-        self.post(&self.endpoints.query, &request).await
+        let start = Instant::now();
+        let result = self.post(&self.endpoints.query, &request).await;
+        metrics::oracle::record_query_duration(start.elapsed());
+        result
     }
 
     async fn secret_rotation(
@@ -236,7 +242,10 @@ impl OracleProxy for ProofVerifierOracle {
             salted_identifier,
             commitment: new_commitment,
         };
-        self.post(&self.endpoints.rotate, &request).await
+        let start = Instant::now();
+        let result = self.post(&self.endpoints.rotate, &request).await;
+        metrics::oracle::record_rotate_duration(start.elapsed());
+        result
     }
 
     async fn v1_face_match(
@@ -248,7 +257,10 @@ impl OracleProxy for ProofVerifierOracle {
             blinded_unique_identifier: HexPoint(blinded_query),
             proofs,
         };
-        self.post(&self.endpoints.face_match, &request).await
+        let start = Instant::now();
+        let result = self.post(&self.endpoints.face_match, &request).await;
+        metrics::oracle::record_face_match_duration(start.elapsed());
+        result
     }
 }
 

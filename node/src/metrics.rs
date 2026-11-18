@@ -83,12 +83,18 @@ pub(crate) mod oracle {
     const METRICS_ID_ORACLE_DURATION: &str = oprf_metrics_key_zkpassport!("oracle.duration");
     /// Metrics key for counting retries of requests to the oracle.
     const METRICS_ID_ORACLE_RETRIES: &str = oprf_metrics_key_zkpassport!("oracle.retries");
+    const METRICS_ATTRID_ENDPOINT: &str = "endpoint";
+    const METRICS_ATTR_FACE_MATCH_ENDPOINT: &str = "face_match";
+    const METRICS_ATTR_IDENTIFY_ENDPOINT: &str = "identify";
+    const METRICS_ATTR_REGISTER_ENDPOINT: &str = "register";
+    const METRICS_ATTR_QUERY_ENDPOINT: &str = "query";
+    const METRICS_ATTR_ROTATE_ENDPOINT: &str = "rotate";
 
     pub(super) fn describe_metrics() {
         metrics::describe_histogram!(
             METRICS_ID_ORACLE_DURATION,
             metrics::Unit::Milliseconds,
-            "Duration of requests to the proof-verifier oracle including retries"
+            "Duration of requests to the proof-verifier oracle including retries, labelled by endpoint"
         );
         metrics::describe_counter!(
             METRICS_ID_ORACLE_RETRIES,
@@ -97,8 +103,24 @@ pub(crate) mod oracle {
         );
     }
 
-    pub(crate) fn record_duration(duration: Duration) {
-        metrics::histogram!(METRICS_ID_ORACLE_DURATION).record(duration.as_secs_f64() * 1000.0);
+    pub(crate) fn record_face_match_duration(duration: Duration) {
+        metrics::histogram!(METRICS_ID_ORACLE_DURATION, METRICS_ATTRID_ENDPOINT => METRICS_ATTR_FACE_MATCH_ENDPOINT).record(duration.as_secs_f64() * 1000.0);
+    }
+
+    pub(crate) fn record_identify_duration(duration: Duration) {
+        metrics::histogram!(METRICS_ID_ORACLE_DURATION, METRICS_ATTRID_ENDPOINT => METRICS_ATTR_IDENTIFY_ENDPOINT).record(duration.as_secs_f64() * 1000.0);
+    }
+
+    pub(crate) fn record_register_duration(duration: Duration) {
+        metrics::histogram!(METRICS_ID_ORACLE_DURATION, METRICS_ATTRID_ENDPOINT => METRICS_ATTR_REGISTER_ENDPOINT).record(duration.as_secs_f64() * 1000.0);
+    }
+
+    pub(crate) fn record_query_duration(duration: Duration) {
+        metrics::histogram!(METRICS_ID_ORACLE_DURATION, METRICS_ATTRID_ENDPOINT => METRICS_ATTR_QUERY_ENDPOINT).record(duration.as_secs_f64() * 1000.0);
+    }
+
+    pub(crate) fn record_rotate_duration(duration: Duration) {
+        metrics::histogram!(METRICS_ID_ORACLE_DURATION, METRICS_ATTRID_ENDPOINT => METRICS_ATTR_ROTATE_ENDPOINT).record(duration.as_secs_f64() * 1000.0);
     }
 
     pub(crate) fn inc_retries() {

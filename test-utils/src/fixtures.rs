@@ -1,7 +1,7 @@
 //! Test fixture loading for zkPassport OPRF tests.
 //!
-//! Reads proofs, `privateNullifier`, and `beta` from the bundled
-//! `fixtures/zkpassport-proofs.json` file and the v2 request bodies from `fixtures/oprf-v2/`.
+//! Parses proofs, `privateNullifier`, and `beta` from `fixtures/zkpassport-proofs.json` and the
+//! v2 request bodies from `fixtures/oprf-v2/`. The files are embedded at compile time.
 
 use ark_ff::PrimeField;
 use serde::{Deserialize, Deserializer, de::Error as _};
@@ -32,13 +32,8 @@ fn hex_to_bytes(hex: &str) -> Vec<u8> {
 /// Besides the fields read by [`load_fixture_data`], it contains the
 /// `blinded_unique_identifier` computed by zkPassport from `privateNullifier` and `beta`.
 pub fn load_fixture_json() -> serde_json::Value {
-    let fixture_path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/fixtures/zkpassport-proofs.json"
-    );
-    let data = std::fs::read_to_string(fixture_path)
-        .unwrap_or_else(|e| panic!("Failed to read fixture file {fixture_path}: {e}"));
-    serde_json::from_str(&data).expect("Failed to parse fixture JSON")
+    serde_json::from_str(include_str!("../fixtures/zkpassport-proofs.json"))
+        .expect("Failed to parse fixture JSON")
 }
 
 /// Load ZKPassport proofs, privateNullifier, and beta from the fixtures file.
@@ -109,21 +104,15 @@ pub struct V2Fixtures {
 /// Load the v2 fixtures from `fixtures/oprf-v2/`.
 pub fn load_v2_fixtures() -> V2Fixtures {
     V2Fixtures {
-        identify: load_v2_fixture("identify"),
-        register: load_v2_fixture("register"),
-        query: load_v2_fixture("query"),
-        rotate: load_v2_fixture("rotate"),
+        identify: parse_v2_fixture(include_str!("../fixtures/oprf-v2/identify.json")),
+        register: parse_v2_fixture(include_str!("../fixtures/oprf-v2/register.json")),
+        query: parse_v2_fixture(include_str!("../fixtures/oprf-v2/query.json")),
+        rotate: parse_v2_fixture(include_str!("../fixtures/oprf-v2/rotate.json")),
     }
 }
 
-fn load_v2_fixture<T: serde::de::DeserializeOwned>(name: &str) -> T {
-    let path = format!(
-        "{}/fixtures/oprf-v2/{name}.json",
-        env!("CARGO_MANIFEST_DIR")
-    );
-    let data = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("Failed to read fixture file {path}: {e}"));
-    serde_json::from_str(&data).unwrap_or_else(|e| panic!("Failed to parse {path}: {e}"))
+fn parse_v2_fixture<T: serde::de::DeserializeOwned>(json: &str) -> T {
+    serde_json::from_str(json).expect("Failed to parse v2 fixture JSON")
 }
 
 /// Parses `0x` followed by the big-endian hex of the x and y coordinate, 32 bytes each.

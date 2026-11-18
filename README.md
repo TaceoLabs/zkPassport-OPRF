@@ -9,7 +9,7 @@ This is a monorepo containing:
 * `authentication`: A library crate that defines the authentication types, error codes, and oracle-error mapping used by the zkPassport OPRF flow.
 * `client`: A library crate implementing the client-side logic for performing a distributed, verifiable OPRF evaluation with zkPassport authentication.
 * `contracts`: Foundry project containing the smart contracts (inherited from the upstream OPRF service).
-* `dev-client`: A binary crate providing a development/testing client that exercises the full OPRF + authentication flow using fixture data.
+* `dev-client`: A binary crate that runs the end-to-end test, smoke tests and a stress test against local or deployed nodes using fixture data.
 * `node`: A binary + library crate implementing the zkPassport OPRF node — the main service binary that handles OPRF requests with face-match authentication.
 
 ## Dev Dependencies
@@ -66,13 +66,19 @@ This will:
 
 Log files for all processes are written to the `logs/` directory. Press `Ctrl+C` to tear down.
 
-`just e2e-test` starts the setup and runs the end-to-end test (`node/tests/e2e.rs`, once per fresh node database).
+`just e2e-test` starts the setup, runs the end-to-end test (`node/tests/e2e.rs`, once per fresh node database) and then `stress identify`.
 
-You can then interact with the running nodes using the dev client:
+## Testing deployed systems
 
-```sh
-just run-dev-client test
-```
+The `dev-client` runs the fixtures against nodes given with `--nodes <url>,<url>,<url>` (`OPRF_DEV_CLIENT_NODES`) and the customer key with `--oprf-key-id`. It also works against the local setup.
+
+| Environment | Command |
+|---|---|
+| `dev` (`devmode=true`, the fixtures verify) | `just run-dev-client smoke`, repeatable |
+| `dev`, load test | `just run-dev-client stress identify --concurrency 10 --requests 100`, `stress nullifier` |
+| other (`devmode=false`) | `just run-dev-client smoke --prod`: checks that the nodes are up and the verifier rejects the fixture proofs, writes nothing |
+
+The fixtures allow one rotation per node database, which only the end-to-end test performs. Afterwards `smoke` and `stress nullifier` fail on that database, so never run the end-to-end test against a shared environment.
 
 ## Configuration
 

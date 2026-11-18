@@ -14,16 +14,22 @@ publish.workspace = true
 [dependencies]
 ark-babyjubjub.workspace = true
 ark-ff.workspace = true
+eyre.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
 
-reqwest = { workspace = true, optional = true }
+reqwest = { workspace = true, features = ["default-tls", "json"] }
+rustls.workspace = true
+taceo-oprf = { workspace = true, features = ["client", "core", "types"] }
+uuid = { workspace = true, features = ["v4"] }
+webpki-roots.workspace = true
+
 # container harness (feature-gated)
 testcontainers = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["sync"], optional = true }
 
 [features]
-containers = ["dep:reqwest", "dep:testcontainers", "dep:tokio"]
+containers = ["dep:testcontainers", "dep:tokio"]
 
 [lints]

@@ -6925,11 +6925,11 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 [[package]]
 name = "telemetry-batteries"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f7fd36883ae7ffa1006b1ab36d7918db35a985bb96d9f36c26a0a007bc7cfd2"
+source = "git+https://github.com/TaceoLabs/telemetry-batteries?rev=0ab9cef2b4ed893550ecb331be4cb822dc99ea0b#0ab9cef2b4ed893550ecb331be4cb822dc99ea0b"
 dependencies = [
  "backtrace",
  "bon",
+ "cadence",
  "chrono",
  "dirs",
  "eyre",

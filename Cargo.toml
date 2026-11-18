@@ -86,3 +86,6 @@ incremental = false
 inherits = "bench"
 debug = true
 lto = "thin"
+
+[patch.crates-io]
+telemetry-batteries = { git = "https://github.com/TaceoLabs/telemetry-batteries", rev = "0ab9cef2b4ed893550ecb331be4cb822dc99ea0b" }

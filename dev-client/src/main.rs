@@ -2,8 +2,7 @@
 //!
 //! Sends the fixtures of the `zkpassport-oprf-test-utils` crate to a set of OPRF nodes. The
 //! fixtures only verify at nodes in the `dev` environment, whose proof-verifier requests use
-//! `?devmode=true`. The fixtures allow one rotation per node database, so never run the e2e test
-//! (`just e2e-test`) against a deployed system: it breaks `smoke` and `stress nullifier` there.
+//! `?devmode=true`. No command rotates the fixture, so all of them can be repeated.
 //!
 //! Run via:
 //!

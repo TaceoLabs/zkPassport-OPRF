@@ -3,7 +3,7 @@ name = "taceo-zkpassport-dev-client"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "Dev-Client for zkPassport instance of TACEO:OPRF. Used for testing."
+description = "Dev-Client for zkPassport instance of TACEO:OPRF. Runs the end-to-end test and smoke tests against local and deployed nodes."
 readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -12,28 +12,24 @@ keywords = ["cryptography", "mpc", "oprf"]
 publish.workspace = true
 
 [dependencies]
-alloy = { workspace = true, features = ["full", "reqwest", "rpc", "rpc-client-ws"] }
 clap = { workspace = true, features = ["derive", "env"] }
 eyre.workspace = true
-rand.workspace = true
+reqwest = { workspace = true, features = ["default-tls", "json"] }
+ruint.workspace = true
 rustls.workspace = true
-taceo-oprf = { workspace = true, features = ["dev-client"] }
+taceo-oprf = { workspace = true, features = ["client", "types"] }
 tokio = { workspace = true, features = [
-  "net",
+  "macros",
   "rt-multi-thread",
-  "signal",
   "sync",
   "time",
-  "tokio-macros",
 ] }
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = [
   "env-filter",
   "fmt",
 ] }
-uuid = { workspace = true, features = ["serde", "v4"] }
 zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
-zkpassport-oprf-client = { package = "taceo-zkpassport-oprf-client", path = "../client", version = "0.1" }
 zkpassport-oprf-test-utils = { package = "taceo-zkpassport-oprf-test-utils", path = "../test-utils", version = "0.1" }
 
 [lints]

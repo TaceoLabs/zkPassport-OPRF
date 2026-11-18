@@ -180,6 +180,7 @@ main() {
         echo -e "${GREEN}running test..${NOCOLOR}"
         setup
         cargo test -p taceo-zkpassport-oprf-node --test e2e "${OPRF_CARGO_BUILD_ARGS[@]+"${OPRF_CARGO_BUILD_ARGS[@]}"}" -- --ignored
+        client stress identify --concurrency 10 --requests 100
     else
         echo "unknown command: '$1' - supported are setup and e2e-test"
         exit 1

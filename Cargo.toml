@@ -12,7 +12,6 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-alloy = { version = "2.5", default-features = false }
 ark-babyjubjub = { package = "taceo-ark-babyjubjub", version = "0.6" }
 ark-ec = "0.6"
 ark-ff = "0.6"
@@ -25,7 +24,6 @@ config = { version = "0.15", default-features = false }
 eyre = { version = "0.6" }
 jiff = { version = "1.0", default-features = false, features = ["serde", "std"] }
 metrics = "0.24"
-rand = { version = "0.8" }
 reqwest = { version = "0.13", default-features = false }
 ruint = "1.18.0"
 rustls = "0.23"
@@ -42,6 +40,7 @@ tokio = { version = "1" }
 tower-http = { version = "0.7", default-features = false }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3" }
+url = "2"
 uuid = { version = "1" }
 webpki-roots = "1"
 

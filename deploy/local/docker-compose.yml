@@ -1,12 +1,14 @@
 services:
   proof-verifier:
-    image: ${PROOF_VERIFIER_IMAGE:-europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier:61c485465a41aa372adecf22587af7257ec7bde6}
+    image: ${PROOF_VERIFIER_IMAGE:-europe-west2-docker.pkg.dev/proof-verifier/proof-verifier/proof-verifier:sha-502f80f4cf7ebbdb3ac8c15bcfaa598546d1a230}
     container_name: proof-verifier
     ports:
       - "8080:8080"
     environment:
       PORT: 8080
       HOST: 0.0.0.0
+      OPRF_REGISTRATION_PUBLIC_KEY: ${OPRF_REGISTRATION_PUBLIC_KEY:?set by run-setup.sh}
+      CIRCUITS_DIR: /app/src/test/fixtures/oprf-v2/packaged
 
   anvil:
     image: ghcr.io/foundry-rs/foundry:latest

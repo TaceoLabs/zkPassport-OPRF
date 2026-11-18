@@ -8,6 +8,10 @@ GREEN='\033[0;32m'
 
 PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
+# the key of the registration OPRF used to generate the v2 fixtures, pinned in the proof-verifier
+OPRF_REGISTRATION_PUBLIC_KEY=$(jq -r .OPRF_REGISTRATION_PUBLIC_KEY test-utils/fixtures/oprf-v2/meta.json)
+export OPRF_REGISTRATION_PUBLIC_KEY
+
 if [[ -z "${RELEASE_OPRF:-}" ]]; then
     OPRF_CARGO_BUILD_ARGS=()
     OPRF_BUILD_TARGET_DIR="debug"

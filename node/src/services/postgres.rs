@@ -218,6 +218,11 @@ impl ZkPassportDb {
             .await
     }
 }
+
+// If a commit succeeds but its ack is lost to an IO error, the retry reports `AlreadyRegistered` or
+// `CommitmentPreviouslyUsed` although the write was applied. This is accepted: it needs a connection
+// drop in the window between commit and ack, and the client can recover, so it is not worth making
+// the writes idempotent.
 fn is_retryable_error(e: &DbError) -> bool {
     match e {
         DbError::Db(err) => match err {

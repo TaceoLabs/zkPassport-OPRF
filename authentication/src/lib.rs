@@ -5,14 +5,14 @@
 //!
 //! * [`FaceMatchRequestAuth`] — the authentication payload sent by a client,
 //!   containing an OPRF key ID and a list of zkPassport proofs.
-//! * [`RegisterRequestAuth`] — the authentication payload for passport
-//!   registration, which always uses the [`registration_oprf_key_id`].
+//! * [`IdentifyRequestAuth`] — the authentication payload for passport
+//!   identification, which always uses the [`registration_oprf_key_id`].
 //! * [`NullifierRequestAuth`] — the authentication payload for nullifier
 //!   derivation for a registered [`SaltedIdentifier`].
 //! * [`ZKPassportProofResult`] — a single zkPassport proof matching the
 //!   `ProofResult` type from `@zkpassport/utils`.
 //! * [`AuthModules`] — an enum of supported authentication modules
-//!   (`FaceMatch`, `Register` and `Nullifier`).
+//!   (`FaceMatch`, `Identify` and `Nullifier`).
 //! * [`RegistrationRequest`] — the request to register an identifier and
 //!   commitment after the registration OPRF evaluation.
 //! * [`AuthErrorKind`] — authentication error variants with numeric
@@ -128,9 +128,9 @@ pub fn registration_oprf_key_id() -> OprfKeyId {
 pub enum AuthModules {
     /// Face-match authentication using zkPassport zero-knowledge proofs.
     FaceMatch,
-    /// Passport registration, deriving the user identifier under the
+    /// First registration step, deriving the salted identifier under the
     /// [`registration_oprf_key_id`].
-    Register,
+    Identify,
     /// Default nullifier authentication module proving knowledge of a secret in zk.
     Nullifier,
 }
@@ -139,7 +139,7 @@ impl core::fmt::Display for AuthModules {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AuthModules::FaceMatch => f.write_str("face-match"),
-            AuthModules::Register => f.write_str("register"),
+            AuthModules::Identify => f.write_str("identify"),
             AuthModules::Nullifier => f.write_str("nullifier"),
         }
     }
@@ -170,19 +170,19 @@ impl FaceMatchRequestAuth {
     }
 }
 
-/// Authentication payload attached to a registration OPRF request.
+/// Authentication payload attached to an identify OPRF request.
 ///
 /// The client cannot choose the OPRF key: the OPRF node always uses the
 /// [`registration_oprf_key_id`], and verifies the embedded proofs before
 /// proceeding with the OPRF evaluation.
 #[derive(Clone, Serialize, Deserialize)]
-pub struct RegisterRequestAuth {
+pub struct IdentifyRequestAuth {
     /// zkPassport proofs that attest to the user's passport.
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
-impl RegisterRequestAuth {
-    /// Creates a new `RegisterRequestAuth`.
+impl IdentifyRequestAuth {
+    /// Creates a new `IdentifyRequestAuth`.
     #[must_use]
     pub fn new(proofs: Vec<ZKPassportProofResult>) -> Self {
         Self { proofs }
@@ -192,7 +192,7 @@ impl RegisterRequestAuth {
 /// Request when registering an identifier after the registration OPRF evaluation.
 ///
 /// Sent by the client to every OPRF node after it derived its identifier with the
-/// [`AuthModules::Register`] module. The node verifies the proofs, then stores
+/// [`AuthModules::Identify`] module. The node verifies the proofs, then stores
 /// `I` → `commitment`. It rejects the request if `I` is already registered.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegistrationRequest {
@@ -408,8 +408,8 @@ mod tests {
     }
 
     #[test]
-    fn register_request_auth_wire_format() {
-        let auth = RegisterRequestAuth::new(vec![]);
+    fn identify_request_auth_wire_format() {
+        let auth = IdentifyRequestAuth::new(vec![]);
         assert_wire_format(&auth, &json!({ "proofs": [] }));
     }
 

@@ -133,7 +133,7 @@ impl From<OracleError> for AuthErrorKind {
 ///
 /// The oracle pins the public key of `k_reg`, so a client cannot use a key of its own. A user
 /// obtains the inputs for `I` (`r`, the response and `pi`) after the first registration step (see
-/// `RegisterAuthenticator`) and stacks the proof on the base proof in later requests.
+/// `IdentifyAuthenticator`) and stacks the proof on the base proof in later requests.
 ///
 /// The oracle routes are `POST /oprf/v2/{identify,register,query,rotate}`, one per method below.
 /// Every one takes the three base proofs plus the proofs listed in its proof composition.
@@ -142,7 +142,7 @@ pub trait OracleProxy {
     /// Verifies that a user is eligible to obtain the [`SaltedIdentifier`] `I` for the passport
     /// committed in `P`. First step of the registration process.
     ///
-    /// Consumed by `RegisterAuthenticator`,
+    /// Consumed by `IdentifyAuthenticator`,
     /// which then evaluates the OPRF under `k_reg`.
     ///
     /// # Proof Composition

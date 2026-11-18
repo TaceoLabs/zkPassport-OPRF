@@ -14,10 +14,6 @@ use crate::harness::{PN, TestNode, commitment, customer_key_id, hex_point, proof
 
 mod harness;
 
-// TODO: run the v2 flow against the real proof-verifier
-// (`zkpassport_oprf_test_utils::containers::shared_proof_verifier`) once fixtures with v2 proofs
-// exist.
-
 #[tokio::test]
 async fn v2_flow() -> eyre::Result<()> {
     let node = TestNode::start().await?;

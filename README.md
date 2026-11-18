@@ -8,8 +8,9 @@ This is a monorepo containing:
 
 * `authentication`: A library crate that defines the authentication types, error codes, and oracle-error mapping used by the zkPassport OPRF flow.
 * `contracts`: Foundry project containing the smart contracts (inherited from the upstream OPRF service).
-* `dev-client`: A binary crate that runs the end-to-end test, smoke tests and a stress test against local or deployed nodes using fixture data.
-* `node`: A binary + library crate implementing the zkPassport OPRF node — the main service binary that handles OPRF requests with face-match authentication.
+* `dev-client`: A binary crate with smoke and stress tests against local or deployed nodes, using fixture data.
+* `node`: A binary + library crate implementing the zkPassport OPRF node: OPRF requests authenticated by zkPassport proofs, plus the registration and rotation API.
+* `test-utils`: A library crate with the proof fixtures and the node client used by the tests and the `dev-client`.
 
 ## Dev Dependencies
 
@@ -65,7 +66,7 @@ This will:
 
 Log files for all processes are written to the `logs/` directory. Press `Ctrl+C` to tear down.
 
-`just e2e-test` starts the setup, runs the end-to-end test (`node/tests/e2e.rs`, once per fresh node database) and then `stress identify`.
+`just e2e-test` starts the setup, runs the `dev-client` commands `smoke`, `stress nullifier` and `stress identify`, and then the end-to-end test (`node/tests/e2e.rs`).
 
 ## Testing deployed systems
 
@@ -77,7 +78,7 @@ The `dev-client` runs the fixtures against nodes given with `--nodes <url>,<url>
 | `dev`, load test | `just run-dev-client stress identify --concurrency 10 --requests 100`, `stress nullifier` |
 | other (`devmode=false`) | `just run-dev-client smoke --prod`: checks that the nodes are up and the verifier rejects the fixture proofs, writes nothing |
 
-The fixtures allow one rotation per node database, which only the end-to-end test performs. Afterwards `smoke` and `stress nullifier` fail on that database, so never run the end-to-end test against a shared environment.
+The fixtures allow one rotation per node database. Only the end-to-end test rotates, and it targets the local setup. Afterwards `smoke` and `stress nullifier` fail on that setup until it is restarted.
 
 ## Configuration
 
@@ -123,10 +124,10 @@ OPRF key shares are stored in a PostgreSQL schema managed by the upstream `taceo
 
 The node forwards the proofs of a request to the oracle and changes its database only if the oracle accepts them.
 
-* `POST /api/registration`: stores the commitment for a passport identifier `I`. Body: `{"I": <point>, "commitment": <field element>, "proofs": [<proof>, ...]}`. Returns 409 if `I` is registered with another commitment.
-* `POST /api/rotation`: replaces the commitment stored for `I`. Body: `{"I": <point>, "new_commitment": <field element>, "proofs": [<proof>, ...]}`. Returns 404 for an unknown identifier and 409 if the commitment was stored for `I` before.
+* `POST /api/registration`: stores the commitment for a passport identifier `I`. Body: `{"I": <point>, "commitment": <field element>, "proofs": [<proof>, ...]}`. Returns 409 if `I` is already registered.
+* `POST /api/rotation`: replaces the commitment stored for `I`. Body: `{"I": <point>, "new_commitment": <field element>, "proofs": [<proof>, ...]}`. Returns 404 for an unknown identifier and 409 if the commitment was stored for `I` before, which includes the current one.
 
-Repeating a request that succeeded succeeds again. Both endpoints return 400 if the oracle rejects the proofs and 503 if the oracle is not reachable.
+Repeating a request that succeeded returns 409. Both endpoints return 400 if the oracle rejects the proofs and 503 if the oracle is not reachable.
 
 ## Architecture
 

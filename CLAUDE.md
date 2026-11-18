@@ -13,7 +13,7 @@ You are the owner and long-term maintainer of this codebase, and its design is u
 
 # Project
 
-zkPassport's deployment of [TACEO:OPRF](https://github.com/TaceoLabs/oprf-service) with zkPassport proof-based authentication. Workspace crates: `authentication` (shared request/error types), `dev-client`, `node` (OPRF node), `test-utils` (fixtures, proof-verifier testcontainer). The crate overview is in `README.md`.
+zkPassport's deployment of [TACEO:OPRF](https://github.com/TaceoLabs/oprf-service) with zkPassport proof-based authentication. Workspace crates: `authentication` (shared request/error types), `dev-client`, `node` (OPRF node), `test-utils` (fixtures, node client). The crate overview is in `README.md`.
 
 - `contracts/` is a git submodule (`oprf-key-registry`). Do not change contracts here.
 - `node/migrations` are applied on startup. Never edit an existing migration, add a new one.

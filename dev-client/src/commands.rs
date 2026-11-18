@@ -92,7 +92,7 @@ pub(crate) async fn stress(
     let mut errors = BTreeMap::<String, usize>::new();
     while let Some(joined) = tasks.join_next().await {
         match joined? {
-            (latency, Ok(())) => latencies.push(latency),
+            (latency, Ok(_)) => latencies.push(latency),
             (_, Err(err)) => *errors.entry(error_label(&err)).or_default() += 1,
         }
     }

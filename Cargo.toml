@@ -43,6 +43,7 @@ tower-http = { version = "0.7", default-features = false }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3" }
 uuid = { version = "1" }
+webpki-roots = "1"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

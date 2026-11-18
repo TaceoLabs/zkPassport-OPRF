@@ -179,8 +179,13 @@ main() {
         cargo build --workspace "${OPRF_CARGO_BUILD_ARGS[@]+"${OPRF_CARGO_BUILD_ARGS[@]}"}"
         echo -e "${GREEN}running test..${NOCOLOR}"
         setup
-        cargo test -p taceo-zkpassport-oprf-node --test e2e "${OPRF_CARGO_BUILD_ARGS[@]+"${OPRF_CARGO_BUILD_ARGS[@]}"}" -- --ignored
+        client smoke
+        # a second run finds the fixture registered
+        client smoke
+        client stress nullifier --concurrency 10 --requests 100
         client stress identify --concurrency 10 --requests 100
+        # runs last: it rotates the fixture, after which smoke and stress nullifier fail
+        cargo test -p taceo-zkpassport-oprf-node --test e2e "${OPRF_CARGO_BUILD_ARGS[@]+"${OPRF_CARGO_BUILD_ARGS[@]}"}" -- --ignored
     else
         echo "unknown command: '$1' - supported are setup and e2e-test"
         exit 1

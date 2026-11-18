@@ -153,7 +153,8 @@ impl core::fmt::Display for AuthModules {
 #[derive(Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct FaceMatchRequestAuth {
-    /// The OPRF key to use for this request.
+    /// The OPRF key to use for this request. Must not be the [`registration_oprf_key_id`]
+    /// (rejected with [`AuthErrorKind::RequestedOprfRegistrationKey`]).
     pub oprf_key_id: OprfKeyId,
     /// zkPassport proofs that attest to the user's identity.
     pub proofs: Vec<ZKPassportProofResult>,
@@ -266,7 +267,7 @@ pub enum AuthErrorKind {
     /// The oracle service responded with BAD REQUEST.
     #[error("oracle_bad_request")]
     OracleBadRequest(String),
-    /// Requested the OPRF registration key for nullifier creation.
+    /// Requested the OPRF registration key in a module where the client chooses the key.
     #[error("request_oprf_reg_key")]
     RequestedOprfRegistrationKey,
     /// Request for an unknown [`SaltedIdentifier`].

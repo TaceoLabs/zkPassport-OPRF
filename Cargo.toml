@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["authentication", "client", "dev-client", "node", "test-utils"]
+members = ["authentication", "dev-client", "node", "test-utils"]
 
 [workspace.package]
 edition = "2024"

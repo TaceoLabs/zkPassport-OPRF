@@ -7,7 +7,6 @@ A customized deployment of the [TACEO:OPRF service](https://github.com/TaceoLabs
 This is a monorepo containing:
 
 * `authentication`: A library crate that defines the authentication types, error codes, and oracle-error mapping used by the zkPassport OPRF flow.
-* `client`: A library crate implementing the client-side logic for performing a distributed, verifiable OPRF evaluation with zkPassport authentication.
 * `contracts`: Foundry project containing the smart contracts (inherited from the upstream OPRF service).
 * `dev-client`: A binary crate that runs the end-to-end test, smoke tests and a stress test against local or deployed nodes using fixture data.
 * `node`: A binary + library crate implementing the zkPassport OPRF node — the main service binary that handles OPRF requests with face-match authentication.

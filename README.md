@@ -62,9 +62,11 @@ This will:
 2. Deploy the `OprfKeyRegistry` smart contract and register participants
 3. Start a verification oracle (proof-verifier) and 3 OPRF service nodes
 4. Start 3 OPRF key-gen instances (via Docker)
-5. Initialize an OPRF key
+5. Initialize the registration OPRF key (id 1) and a customer OPRF key (id 2)
 
 Log files for all processes are written to the `logs/` directory. Press `Ctrl+C` to tear down.
+
+`just e2e-test` starts the setup and runs the end-to-end test (`node/tests/e2e.rs`, once per fresh node database).
 
 You can then interact with the running nodes using the dev client:
 

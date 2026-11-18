@@ -147,12 +147,16 @@ setup() {
     wait_for_health 10001 "taceo-zkpassport-oprf-node1" 300
     wait_for_health 10002 "taceo-zkpassport-oprf-node2" 300
 
-    echo -e "${GREEN}init an OPRF key..${NOCOLOR}"
-    (cd contracts && OPRF_KEY_REGISTRY_PROXY=$oprf_key_registry OPRF_KEY_ID=1 forge script script/InitKeyGen.s.sol --broadcast --fork-url http://127.0.0.1:8545 --private-key $PK)
+    echo -e "${GREEN}init the registration (1) and the customer (2) OPRF key..${NOCOLOR}"
+    for oprf_key_id in 1 2; do
+        (cd contracts && OPRF_KEY_REGISTRY_PROXY=$oprf_key_registry OPRF_KEY_ID=$oprf_key_id forge script script/InitKeyGen.s.sol --broadcast --fork-url http://127.0.0.1:8545 --private-key $PK)
+    done
 
-    wait_for_oprf_pub 10000 1 300
-    wait_for_oprf_pub 10001 1 300
-    wait_for_oprf_pub 10002 1 300
+    for oprf_key_id in 1 2; do
+        wait_for_oprf_pub 10000 $oprf_key_id 300
+        wait_for_oprf_pub 10001 $oprf_key_id 300
+        wait_for_oprf_pub 10002 $oprf_key_id 300
+    done
 }
 
 client() {
@@ -175,8 +179,7 @@ main() {
         cargo build --workspace "${OPRF_CARGO_BUILD_ARGS[@]+"${OPRF_CARGO_BUILD_ARGS[@]}"}"
         echo -e "${GREEN}running test..${NOCOLOR}"
         setup
-        client --nodes http://127.0.0.1:10000,http://127.0.0.1:10001,http://127.0.0.1:10002 --oprf-key-registry-contract $oprf_key_registry --max-wait-time 10min reshare-test --acceptance-num 5 
-        client --nodes http://127.0.0.1:10000,http://127.0.0.1:10001,http://127.0.0.1:10002 --oprf-key-registry-contract $oprf_key_registry --max-wait-time 10min stress-test-oprf 
+        cargo test -p taceo-zkpassport-oprf-node --test e2e "${OPRF_CARGO_BUILD_ARGS[@]+"${OPRF_CARGO_BUILD_ARGS[@]}"}" -- --ignored
     else
         echo "unknown command: '$1' - supported are setup and e2e-test"
         exit 1

@@ -67,6 +67,8 @@ pub fn start(
         zkpassport_db.clone(),
     ));
 
+    let api_router = api::routes(&node_config, oracle_proxy, zkpassport_db);
+
     tracing::info!("init oprf service..");
     let oprf_router = taceo_oprf::service::OprfServiceBuilder::init(
         node_config,
@@ -90,7 +92,5 @@ pub fn start(
     )
     .build();
 
-    Router::new()
-        .nest("/api", api::routes(oracle_proxy, zkpassport_db))
-        .merge(oprf_router)
+    Router::new().nest("/api", api_router).merge(oprf_router)
 }

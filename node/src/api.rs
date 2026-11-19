@@ -1,9 +1,12 @@
 use axum::{
     Json, Router,
-    extract::{FromRef, State},
+    extract::{DefaultBodyLimit, FromRef, State},
     routing::post,
 };
+use reqwest::StatusCode;
+use taceo_oprf::service::config::OprfNodeServiceConfig;
 use telemetry_batteries::{opentelemetry, tracing::middleware::TraceLayer};
+use tower_http::timeout::TimeoutLayer;
 use tracing::instrument;
 use zkpassport_oprf_authentication::{CommitmentRotationRequest, RegistrationRequest};
 
@@ -77,7 +80,11 @@ async fn registration(
     Ok(())
 }
 
-pub(crate) fn routes(proxy: OracleProxyService, db: ZkPassportDb) -> Router {
+pub(crate) fn routes(
+    config: &OprfNodeServiceConfig,
+    proxy: OracleProxyService,
+    db: ZkPassportDb,
+) -> Router {
     Router::new()
         .route("/registration", post(registration))
         .route("/rotation", post(rotation))
@@ -102,5 +109,10 @@ pub(crate) fn routes(proxy: OracleProxyService, db: ZkPassportDb) -> Router {
                 "span.type" = "web",
             )
         }))
+        .layer(TimeoutLayer::with_status_code(
+                    StatusCode::REQUEST_TIMEOUT,
+                    config.session_lifetime, // use session lifetime align with ws timeout
+                ))
+                .layer(DefaultBodyLimit::max(config.ws_max_message_size))
         .with_state(AppState { proxy, db })
 }

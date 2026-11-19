@@ -161,6 +161,7 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
             node_config.oracle_base_url,
             node_config.node_config.environment,
             node_config.oracle_retry_layer,
+            node_config.oracle_max_concurrent_requests,
         )
         .context("while building oracle proxy")?,
     );

@@ -23,6 +23,8 @@ pub(crate) enum ApiError {
     BadRequest(String),
     #[error("oracle not reachable")]
     OracleUnavailable,
+    #[error("overloaded - try again later")]
+    Overloaded,
     #[error("internal error: {0:?}")]
     Internal(#[from] eyre::Report),
 }
@@ -32,6 +34,7 @@ impl From<OracleError> for ApiError {
         match err {
             OracleError::BadRequest(reason) => Self::BadRequest(reason),
             OracleError::OracleNotReachable(_) => Self::OracleUnavailable,
+            OracleError::Overloaded(_) => Self::Overloaded,
             OracleError::UnexpectedStatusCode { .. } | OracleError::InvalidMessage(_) => {
                 Self::Internal(eyre::Report::from(err))
             }
@@ -58,6 +61,7 @@ impl ApiError {
             | Self::AlreadyRegistered
             | Self::CommitmentPreviouslyUsed
             | Self::BadRequest(_) => tracing::warn!(err = ?self, auth_error = true, "{self}"),
+            Self::Overloaded => tracing::warn!(err = ?self, "{self}"),
             Self::OracleUnavailable => tracing::error!(err = ?self, "{self}"),
             Self::Internal(report) => tracing::error!(err = ?report, "internal error"),
         }
@@ -73,7 +77,9 @@ impl IntoResponse for ApiError {
             Self::AlreadyRegistered | Self::CommitmentPreviouslyUsed => {
                 (StatusCode::CONFLICT, self.to_string())
             }
-            Self::OracleUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
+            Self::OracleUnavailable | Self::Overloaded => {
+                (StatusCode::SERVICE_UNAVAILABLE, self.to_string())
+            }
             Self::Internal(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal server error".to_owned(),

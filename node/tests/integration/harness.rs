@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::Write as _,
-    num::NonZeroU16,
+    num::{NonZeroU16, NonZeroUsize},
     sync::{Arc, Mutex},
 };
 
@@ -108,6 +108,7 @@ impl TestNode {
             verifier_url.parse()?,
             Environment::Dev,
             retry,
+            NonZeroUsize::new(1024).expect("non-zero"),
         )?;
 
         let mut config = OprfNodeServiceConfig::with_default_values(

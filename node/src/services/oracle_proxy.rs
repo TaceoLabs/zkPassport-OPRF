@@ -47,12 +47,19 @@ pub enum OracleError {
     /// Serde
     #[error(transparent)]
     InvalidMessage(#[from] serde_json::Error),
+    /// All permits for concurrent oracle requests are taken
+    #[error("too many concurrent oracle requests")]
+    Overloaded(#[from] tokio::sync::TryAcquireError),
+    #[error("proof verifier timeout - try again")]
+    OracleTimeout,
 }
 
 impl OracleError {
     pub(crate) fn log(&self) {
         if matches!(self, Self::BadRequest(_)) {
             tracing::warn!(err=?self, auth_error = true, "{self}");
+        } else if matches!(self, Self::Overloaded(_)) {
+            tracing::warn!(err=?self, "{self}");
         } else {
             tracing::error!(err=?self, "{self}");
         }
@@ -64,6 +71,7 @@ impl From<OracleError> for AuthErrorKind {
         match value {
             OracleError::OracleNotReachable(_) => Self::OracleNotReachable,
             OracleError::BadRequest(reason) => Self::OracleBadRequest(reason),
+            OracleError::Overloaded(_) => Self::Overloaded,
             OracleError::UnexpectedStatusCode { .. } | OracleError::InvalidMessage(_) => {
                 Self::Internal
             }

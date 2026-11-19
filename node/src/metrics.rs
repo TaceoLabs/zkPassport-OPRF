@@ -90,6 +90,11 @@ pub(crate) mod oracle {
     const METRICS_ATTR_QUERY_ENDPOINT: &str = "query";
     const METRICS_ATTR_ROTATE_ENDPOINT: &str = "rotate";
 
+    /// Metrics key for the duration of requests to the oracle, including retries.
+    const METRICS_ID_ORACLE_TIMEOUT: &str = oprf_metrics_key_zkpassport!("oracle.timeout");
+    const METRICS_ID_ORACLE_TOO_MANY_REQUESTS: &str =
+        oprf_metrics_key_zkpassport!("oracle.too_many_requests");
+
     pub(super) fn describe_metrics() {
         metrics::describe_histogram!(
             METRICS_ID_ORACLE_DURATION,
@@ -100,6 +105,18 @@ pub(crate) mod oracle {
             METRICS_ID_ORACLE_RETRIES,
             metrics::Unit::Count,
             "Number of retries of requests to the proof-verifier oracle"
+        );
+
+        metrics::describe_counter!(
+            METRICS_ID_ORACLE_TIMEOUT,
+            metrics::Unit::Count,
+            "Number of times requests to the proof-verifier oracle ran into a timeout"
+        );
+
+        metrics::describe_counter!(
+            METRICS_ID_ORACLE_TOO_MANY_REQUESTS,
+            metrics::Unit::Count,
+            "Number of requests we rejected because proof-verifier oracle had too many requests"
         );
     }
 
@@ -125,5 +142,13 @@ pub(crate) mod oracle {
 
     pub(crate) fn inc_retries() {
         metrics::counter!(METRICS_ID_ORACLE_RETRIES).increment(1);
+    }
+
+    pub(crate) fn inc_timeout() {
+        metrics::counter!(METRICS_ID_ORACLE_TIMEOUT).increment(1);
+    }
+
+    pub(crate) fn inc_too_many_requests() {
+        metrics::counter!(METRICS_ID_ORACLE_TOO_MANY_REQUESTS).increment(1);
     }
 }

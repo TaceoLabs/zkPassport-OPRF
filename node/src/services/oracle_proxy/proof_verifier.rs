@@ -172,6 +172,7 @@ impl ProofVerifierOracle {
                 Err(OracleError::BadRequest(error_msg))
             } else if status == StatusCode::REQUEST_TIMEOUT {
                 tracing::trace!("oracle request ran into timeout");
+                metrics::oracle::inc_timeout();
                 Err(OracleError::OracleTimeout)
             } else {
                 tracing::trace!("unknown status code: {status}");

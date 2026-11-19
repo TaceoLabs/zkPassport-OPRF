@@ -62,11 +62,11 @@ pub struct RetryLayerConfig {
 
 impl ZkPassportNodeConfig {
     fn default_oracle_request_timeout() -> Duration {
-        Duration::from_secs(20)
+        Duration::from_secs(3)
     }
 
     fn default_oracle_max_concurrent_requests() -> NonZeroUsize {
-        NonZeroUsize::new(1024).expect("non-zero")
+        NonZeroUsize::new(128).expect("non-zero")
     }
 }
 
@@ -86,7 +86,7 @@ impl RetryLayerConfig {
     }
 
     fn default_verifier_request_max_attempts() -> usize {
-        5
+        3
     }
 
     #[allow(dead_code, reason = "used in test")]

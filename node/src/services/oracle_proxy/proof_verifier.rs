@@ -145,7 +145,7 @@ impl ProofVerifierOracle {
     ///
     /// `Ok(())` iff the oracle answered 200. A 400 becomes [`OracleError::BadRequest`] with the
     /// oracle's error message.
-    #[instrument(level = "info", skip_all)]
+    #[instrument(level = "info", skip_all, fields(url=%url))]
     async fn post(&self, url: &Url, body: &impl Serialize) -> Result<()> {
         tracing::trace!("sending verify request to oracle: {url}");
         (|| async {
@@ -168,6 +168,9 @@ impl ProofVerifierOracle {
                     }
                 };
                 Err(OracleError::BadRequest(error_msg))
+            } else if status == StatusCode::REQUEST_TIMEOUT {
+                tracing::trace!("oracle request ran into timeout");
+                Err(OracleError::OracleTimeout)
             } else {
                 tracing::trace!("unknown status code: {status}");
                 let body = response.text().await?;
@@ -297,25 +300,25 @@ fn is_retryable_error(e: &OracleError) -> bool {
     // Transport-level failures: no usable response came back.
     //
     // HTTP status failures worth retrying:
-    // * 408 REQUEST TIMEOUT
     // * 429 TOO MANY REQUESTS
     // * 502 BAD GATEWAY
     // * 503 SERVICE UNAVAILABLE
     // * 504 GATEWAY TIMEOUT
     //
-    // we do not retry INTERNAL SERVER ERROR
+    // We do not retry INTERNAL SERVER ERROR, nor REQUEST TIMEOUT: the oracle already spent its
+    // full verification budget on these proofs and would likely time out again.
     match e {
         OracleError::OracleNotReachable(error) => error.is_connect(),
         OracleError::UnexpectedStatusCode { status, .. } => matches!(
             *status,
-            StatusCode::REQUEST_TIMEOUT
-                | StatusCode::TOO_MANY_REQUESTS
+            StatusCode::TOO_MANY_REQUESTS
                 | StatusCode::BAD_GATEWAY
                 | StatusCode::SERVICE_UNAVAILABLE
                 | StatusCode::GATEWAY_TIMEOUT
         ),
         OracleError::BadRequest(_)
         | OracleError::InvalidMessage(_)
+        | OracleError::OracleTimeout
         | OracleError::Overloaded(_) => false,
     }
 }
@@ -424,6 +427,14 @@ mod tests {
             err,
             OracleError::UnexpectedStatusCode { status, .. } if status == StatusCode::INTERNAL_SERVER_ERROR
         ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn face_match_timeout_test() -> eyre::Result<()> {
+        let (_server, oracle) = mock_oracle(AxumStatus::REQUEST_TIMEOUT, json!({}))?;
+        let err = face_match(&oracle).await.expect_err("Should fail");
+        assert!(matches!(err, OracleError::OracleTimeout));
         Ok(())
     }
 
@@ -575,7 +586,6 @@ mod tests {
             body: String::new(),
         };
         for status in [
-            StatusCode::REQUEST_TIMEOUT,
             StatusCode::TOO_MANY_REQUESTS,
             StatusCode::BAD_GATEWAY,
             StatusCode::SERVICE_UNAVAILABLE,
@@ -590,6 +600,7 @@ mod tests {
         ] {
             assert!(!is_retryable_error(&status_error(status)), "{status}");
         }
+        assert!(!is_retryable_error(&OracleError::OracleTimeout));
         assert!(!is_retryable_error(&OracleError::BadRequest(
             "invalid proof".to_owned()
         )));

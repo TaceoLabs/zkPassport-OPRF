@@ -273,6 +273,9 @@ pub enum AuthErrorKind {
     /// Request for an unknown [`SaltedIdentifier`].
     #[error("unknown_identifier")]
     UnknownIdentifier,
+    /// The oracle timed out while verifying the proofs.
+    #[error("oracle_timeout")]
+    OracleTimeout,
     /// The node is at capacity and sheds the request.
     #[error("overloaded")]
     Overloaded,
@@ -291,6 +294,8 @@ pub mod error_codes {
     pub const REQUESTED_OPRF_REGISTRATION_KEY: u16 = 4502;
     /// Error code for [`super::AuthErrorKind::UnknownIdentifier`].
     pub const UNKNOWN_IDENTIFIER: u16 = 4503;
+    /// Error code for [`super::AuthErrorKind::OracleTimeout`].
+    pub const ORACLE_TIMEOUT: u16 = 4504;
     /// Error code for [`super::AuthErrorKind::Overloaded`], the WebSocket "Try Again Later" code.
     pub const OVERLOADED: u16 = 1013;
     /// Error code for [`super::AuthErrorKind::Internal`].
@@ -306,6 +311,7 @@ impl From<AuthErrorKind> for u16 {
                 error_codes::REQUESTED_OPRF_REGISTRATION_KEY
             }
             AuthErrorKind::UnknownIdentifier => error_codes::UNKNOWN_IDENTIFIER,
+            AuthErrorKind::OracleTimeout => error_codes::ORACLE_TIMEOUT,
             AuthErrorKind::Overloaded => error_codes::OVERLOADED,
             AuthErrorKind::Internal => error_codes::INTERNAL,
         }
@@ -326,6 +332,9 @@ impl From<AuthErrorKind> for OprfRequestAuthenticatorError {
             }
             AuthErrorKind::UnknownIdentifier => {
                 taceo_oprf::types::close_frame_message!("unknown identifier")
+            }
+            AuthErrorKind::OracleTimeout => {
+                taceo_oprf::types::close_frame_message!("oracle timeout - try again later")
             }
             AuthErrorKind::Overloaded => {
                 taceo_oprf::types::close_frame_message!("overloaded - try again later")

@@ -50,7 +50,8 @@ pub enum OracleError {
     /// All permits for concurrent oracle requests are taken
     #[error("too many concurrent oracle requests")]
     Overloaded(#[from] tokio::sync::TryAcquireError),
-    #[error("proof verifier timeout - try again")]
+    /// Oracle answered with REQUEST TIMEOUT
+    #[error("oracle timeout")]
     OracleTimeout,
 }
 
@@ -71,6 +72,7 @@ impl From<OracleError> for AuthErrorKind {
         match value {
             OracleError::OracleNotReachable(_) => Self::OracleNotReachable,
             OracleError::BadRequest(reason) => Self::OracleBadRequest(reason),
+            OracleError::OracleTimeout => Self::OracleTimeout,
             OracleError::Overloaded(_) => Self::Overloaded,
             OracleError::UnexpectedStatusCode { .. } | OracleError::InvalidMessage(_) => {
                 Self::Internal

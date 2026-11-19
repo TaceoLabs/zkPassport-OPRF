@@ -110,7 +110,7 @@ pub(crate) fn routes(
             )
         }))
         .layer(TimeoutLayer::with_status_code(
-                    StatusCode::REQUEST_TIMEOUT,
+                    StatusCode::SERVICE_UNAVAILABLE,
                     config.session_lifetime, // use session lifetime align with ws timeout
                 ))
                 .layer(DefaultBodyLimit::max(config.ws_max_message_size))

@@ -23,6 +23,8 @@ pub(crate) enum ApiError {
     BadRequest(String),
     #[error("oracle not reachable")]
     OracleUnavailable,
+    #[error("oracle timeout")]
+    OracleTimeout,
     #[error("overloaded - try again later")]
     Overloaded,
     #[error("internal error: {0:?}")]
@@ -34,6 +36,7 @@ impl From<OracleError> for ApiError {
         match err {
             OracleError::BadRequest(reason) => Self::BadRequest(reason),
             OracleError::OracleNotReachable(_) => Self::OracleUnavailable,
+            OracleError::OracleTimeout => Self::OracleTimeout,
             OracleError::Overloaded(_) => Self::Overloaded,
             OracleError::UnexpectedStatusCode { .. } | OracleError::InvalidMessage(_) => {
                 Self::Internal(eyre::Report::from(err))
@@ -62,7 +65,7 @@ impl ApiError {
             | Self::CommitmentPreviouslyUsed
             | Self::BadRequest(_) => tracing::warn!(err = ?self, auth_error = true, "{self}"),
             Self::Overloaded => tracing::warn!(err = ?self, "{self}"),
-            Self::OracleUnavailable => tracing::error!(err = ?self, "{self}"),
+            Self::OracleUnavailable | Self::OracleTimeout => tracing::error!(err = ?self, "{self}"),
             Self::Internal(report) => tracing::error!(err = ?report, "internal error"),
         }
     }
@@ -80,6 +83,7 @@ impl IntoResponse for ApiError {
             Self::OracleUnavailable | Self::Overloaded => {
                 (StatusCode::SERVICE_UNAVAILABLE, self.to_string())
             }
+            Self::OracleTimeout => (StatusCode::GATEWAY_TIMEOUT, self.to_string()),
             Self::Internal(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal server error".to_owned(),
@@ -95,7 +99,7 @@ mod tests {
 
     #[test]
     fn status_codes() {
-        let cases: [(ApiError, StatusCode); 5] = [
+        let cases: [(ApiError, StatusCode); 6] = [
             (DbError::UnknownIdentifier.into(), StatusCode::NOT_FOUND),
             (
                 DbError::CommitmentPreviouslyUsed.into(),
@@ -112,6 +116,10 @@ mod tests {
                 }
                 .into(),
                 StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+            (
+                OracleError::OracleTimeout.into(),
+                StatusCode::GATEWAY_TIMEOUT,
             ),
             (
                 eyre::eyre!("boom").into(),

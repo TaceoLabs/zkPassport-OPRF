@@ -97,7 +97,7 @@ All oracle requests go through one proxy built from a base URL. Endpoint paths a
 * `<base>/verify-oprf-auth`: face-match verification (v1)
 * `<base>/oprf/v2/identify`, `register`, `query` and `rotate`: proof verification of the four v2 steps
 
-In the `dev` environment, `?devmode=true` is added to every endpoint. Connection errors and HTTP 408, 429, 502, 503 and 504 are retried with exponential backoff.
+In the `dev` environment, `?devmode=true` is added to every endpoint. Connection errors and HTTP 429, 502, 503 and 504 are retried with exponential backoff.
 
 | Variable | Required | Description |
 |----------|----------|-------------|

@@ -15,6 +15,8 @@ use crate::{
 };
 
 pub(crate) mod errors;
+#[cfg(test)]
+mod tests;
 
 type ApiResult<T> = std::result::Result<T, ApiError>;
 
@@ -88,6 +90,11 @@ pub(crate) fn routes(
     Router::new()
         .route("/registration", post(registration))
         .route("/rotation", post(rotation))
+        .layer(DefaultBodyLimit::max(config.ws_max_message_size))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::SERVICE_UNAVAILABLE,
+            config.session_lifetime,
+        ))
         .layer(TraceLayer::new_for_axum().with_make_span(|req| {
             let headers = req.headers();
             tracing::info_span!(
@@ -109,10 +116,5 @@ pub(crate) fn routes(
                 "span.type" = "web",
             )
         }))
-        .layer(TimeoutLayer::with_status_code(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    config.session_lifetime, // use session lifetime align with ws timeout
-                ))
-                .layer(DefaultBodyLimit::max(config.ws_max_message_size))
         .with_state(AppState { proxy, db })
 }

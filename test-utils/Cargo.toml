@@ -1,6 +1,6 @@
 [package]
 name = "taceo-zkpassport-oprf-test-utils"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "Shared test fixtures and node client for zkPassport OPRF."
@@ -17,7 +17,7 @@ ark-ff.workspace = true
 eyre.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.1" }
+zkpassport-oprf-authentication = { package = "taceo-zkpassport-oprf-authentication", path = "../authentication", version = "0.2" }
 
 reqwest = { workspace = true, features = ["default-tls", "json"] }
 rustls.workspace = true

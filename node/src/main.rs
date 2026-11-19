@@ -10,8 +10,8 @@ use std::{net::SocketAddr, process::ExitCode, sync::Arc, time::Duration};
 use backon::{ConstantBuilder, Retryable};
 use eyre::Context as _;
 use serde::Deserialize;
-use taceo_nodes_common::postgres::PostgresConfig;
 use taceo_oprf::{
+    nodes_common::{default_shutdown_signal, postgres::PostgresConfig, spawn_shutdown_task},
     service::secret_manager::{SecretManager, postgres::PostgresSecretManager},
     types::service::NodeInformation,
 };
@@ -109,7 +109,7 @@ async fn load_node_information(
 /// # Errors
 /// Returns an error if startup fails or if a spawned task returns an error during shutdown.
 async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
-    tracing::info!("{}", taceo_nodes_common::version_info!());
+    tracing::info!("{}", taceo_oprf::nodes_common::version_info!());
 
     tracing::info!("starting oprf-node with config: {config:#?}");
     tracing::info!(
@@ -131,8 +131,7 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
         .await
         .context("while starting zk-passport DB")?;
 
-    let (cancellation_token, _) =
-        taceo_nodes_common::spawn_shutdown_task(taceo_nodes_common::default_shutdown_signal());
+    let (cancellation_token, _) = spawn_shutdown_task(default_shutdown_signal());
 
     // load node information in a retry loop for GCP deployments.
     // we wait for the cancellation token to catch shutdowns.
@@ -173,7 +172,7 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
         secret_manager,
         zkpassport_db,
         &node_information,
-        taceo_nodes_common::version_info!(),
+        taceo_oprf::nodes_common::version_info!(),
     )
     .layer(CatchPanicLayer::new());
 

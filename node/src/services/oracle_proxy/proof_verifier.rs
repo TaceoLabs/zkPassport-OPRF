@@ -1,4 +1,4 @@
-use std::{fmt::Write as _, time::Instant};
+use std::{fmt::Write as _, num::NonZeroUsize, sync::Arc, time::Instant};
 
 use ark_serialize::CanonicalSerialize as _;
 use backon::{ExponentialBuilder, Retryable as _};
@@ -8,6 +8,7 @@ use taceo_oprf::{
     service::Environment,
     types::{ark_babyjubjub, async_trait::async_trait},
 };
+use tokio::sync::Semaphore;
 use tracing::instrument;
 use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier, ZKPassportProofResult};
 
@@ -117,6 +118,7 @@ pub struct ProofVerifierOracle {
     client: reqwest::Client,
     endpoints: OracleEndpoints,
     backoff: ExponentialBuilder,
+    permits: Arc<Semaphore>,
 }
 
 impl ProofVerifierOracle {
@@ -129,11 +131,13 @@ impl ProofVerifierOracle {
         base_url: Url,
         environment: Environment,
         retry_layer: RetryLayerConfig,
+        max_concurrent_requests: NonZeroUsize,
     ) -> eyre::Result<Self> {
         Ok(Self {
             client,
             endpoints: OracleEndpoints::new(base_url, environment)?,
             backoff: retry_layer.exponential_backoff(),
+            permits: Arc::new(Semaphore::new(max_concurrent_requests.get())),
         })
     }
 
@@ -145,7 +149,10 @@ impl ProofVerifierOracle {
     async fn post(&self, url: &Url, body: &impl Serialize) -> Result<()> {
         tracing::trace!("sending verify request to oracle: {url}");
         (|| async {
-            let response = self.client.post(url.clone()).json(body).send().await?;
+            let response = {
+                let _permit = self.permits.try_acquire()?;
+                self.client.post(url.clone()).json(body).send().await
+            }?;
             let status = response.status();
             if status == StatusCode::OK {
                 tracing::trace!("oracle verified proofs successfully");
@@ -307,7 +314,9 @@ fn is_retryable_error(e: &OracleError) -> bool {
                 | StatusCode::SERVICE_UNAVAILABLE
                 | StatusCode::GATEWAY_TIMEOUT
         ),
-        OracleError::BadRequest(_) | OracleError::InvalidMessage(_) => false,
+        OracleError::BadRequest(_)
+        | OracleError::InvalidMessage(_)
+        | OracleError::Overloaded(_) => false,
     }
 }
 
@@ -340,6 +349,7 @@ mod tests {
             url.parse()?,
             Environment::Test,
             retry,
+            NonZeroUsize::MIN,
         )?;
         Ok((server, oracle))
     }
@@ -426,6 +436,7 @@ mod tests {
             "http://127.0.0.1:1".parse()?,
             Environment::Test,
             RetryLayerConfig::disabled(),
+            NonZeroUsize::MIN,
         )?;
         let err = face_match(&oracle).await.expect_err("Should fail");
         assert!(matches!(err, OracleError::OracleNotReachable(err) if err.is_connect()));

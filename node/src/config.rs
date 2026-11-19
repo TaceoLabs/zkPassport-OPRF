@@ -1,6 +1,6 @@
 //! Configuration types and CLI/environment parsing for the OPRF node.
 
-use std::time::Duration;
+use std::{num::NonZeroUsize, time::Duration};
 
 use backon::ExponentialBuilder;
 use reqwest::Url;
@@ -20,6 +20,10 @@ pub struct ZkPassportNodeConfig {
     #[serde(default = "ZkPassportNodeConfig::default_oracle_request_timeout")]
     #[serde(with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required")]
     pub oracle_request_timeout: Duration,
+
+    /// Max number of in-flight requests to the verifier oracle. Requests beyond this are rejected.
+    #[serde(default = "ZkPassportNodeConfig::default_oracle_max_concurrent_requests")]
+    pub oracle_max_concurrent_requests: NonZeroUsize,
 
     /// The retry layer config for requests to the verifier oracle.
     #[serde(rename = "retry")]
@@ -58,7 +62,11 @@ pub struct RetryLayerConfig {
 
 impl ZkPassportNodeConfig {
     fn default_oracle_request_timeout() -> Duration {
-        Duration::from_secs(25)
+        Duration::from_secs(20)
+    }
+
+    fn default_oracle_max_concurrent_requests() -> NonZeroUsize {
+        NonZeroUsize::new(1024).expect("non-zero")
     }
 }
 
@@ -117,6 +125,7 @@ impl ZkPassportNodeConfig {
         Self {
             oracle_base_url,
             oracle_request_timeout: Self::default_oracle_request_timeout(),
+            oracle_max_concurrent_requests: Self::default_oracle_max_concurrent_requests(),
             oracle_retry_layer: RetryLayerConfig::with_default_values(),
             node_config: OprfNodeServiceConfig::with_default_values(environment, version_req),
         }

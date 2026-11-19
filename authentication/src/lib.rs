@@ -273,6 +273,9 @@ pub enum AuthErrorKind {
     /// Request for an unknown [`SaltedIdentifier`].
     #[error("unknown_identifier")]
     UnknownIdentifier,
+    /// The node is at capacity and sheds the request.
+    #[error("overloaded")]
+    Overloaded,
     /// An unexpected internal error occurred.
     #[error("internal_server_error")]
     Internal,
@@ -288,6 +291,8 @@ pub mod error_codes {
     pub const REQUESTED_OPRF_REGISTRATION_KEY: u16 = 4502;
     /// Error code for [`super::AuthErrorKind::UnknownIdentifier`].
     pub const UNKNOWN_IDENTIFIER: u16 = 4503;
+    /// Error code for [`super::AuthErrorKind::Overloaded`], the WebSocket "Try Again Later" code.
+    pub const OVERLOADED: u16 = 1013;
     /// Error code for [`super::AuthErrorKind::Internal`].
     pub const INTERNAL: u16 = 1011;
 }
@@ -301,6 +306,7 @@ impl From<AuthErrorKind> for u16 {
                 error_codes::REQUESTED_OPRF_REGISTRATION_KEY
             }
             AuthErrorKind::UnknownIdentifier => error_codes::UNKNOWN_IDENTIFIER,
+            AuthErrorKind::Overloaded => error_codes::OVERLOADED,
             AuthErrorKind::Internal => error_codes::INTERNAL,
         }
     }
@@ -320,6 +326,9 @@ impl From<AuthErrorKind> for OprfRequestAuthenticatorError {
             }
             AuthErrorKind::UnknownIdentifier => {
                 taceo_oprf::types::close_frame_message!("unknown identifier")
+            }
+            AuthErrorKind::Overloaded => {
+                taceo_oprf::types::close_frame_message!("overloaded - try again later")
             }
             AuthErrorKind::Internal => {
                 taceo_oprf::types::close_frame_message!("internal")

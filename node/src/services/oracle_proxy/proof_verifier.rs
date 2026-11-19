@@ -149,17 +149,19 @@ impl ProofVerifierOracle {
     async fn post(&self, url: &Url, body: &impl Serialize) -> Result<()> {
         tracing::trace!("sending verify request to oracle: {url}");
         (|| async {
-            let response = {
+            let (status, body) = {
                 let _permit = self.permits.try_acquire()?;
-                self.client.post(url.clone()).json(body).send().await
-            }?;
-            let status = response.status();
-            if status == StatusCode::OK {
-                tracing::trace!("oracle verified proofs successfully");
-                Ok(())
-            } else if status == StatusCode::BAD_REQUEST {
-                tracing::trace!("received BAD REQUEST from oracle");
+                let response = self.client.post(url.clone()).json(body).send().await?;
+                let status = response.status();
+                if status == StatusCode::OK {
+                    tracing::trace!("oracle verified proofs successfully");
+                    return Ok(());
+                }
                 let body = response.text().await?;
+                Result::Ok((status, body))
+            }?;
+            if status == StatusCode::BAD_REQUEST {
+                tracing::trace!("received BAD REQUEST from oracle");
                 let error_msg = match serde_json::from_str::<OracleResponse>(&body) {
                     Ok(response) => response.error.unwrap_or_else(|| "unknown".to_owned()),
                     Err(err) => {
@@ -173,7 +175,6 @@ impl ProofVerifierOracle {
                 Err(OracleError::OracleTimeout)
             } else {
                 tracing::trace!("unknown status code: {status}");
-                let body = response.text().await?;
                 Err(OracleError::UnexpectedStatusCode { status, body })
             }
         })

@@ -1,7 +1,7 @@
 use backon::Retryable as _;
 use eyre::Context as _;
 use sqlx::PgPool;
-use taceo_nodes_common::postgres::{CreateSchema, PostgresConfig};
+use taceo_oprf::nodes_common::postgres::{CreateSchema, PostgresConfig};
 use tracing::instrument;
 use zkpassport_oprf_authentication::{AuthCommitment, AuthErrorKind, SaltedIdentifier};
 
@@ -64,9 +64,10 @@ impl ZkPassportDb {
     #[instrument(level = "debug", skip_all)]
     pub async fn init(config: &PostgresConfig) -> eyre::Result<Self> {
         tracing::info!("init PgPool with schema: {}", config.schema);
-        let pool = taceo_nodes_common::postgres::pg_pool_with_schema(config, CreateSchema::Yes)
-            .await
-            .context("while connecting to postgres DB")?;
+        let pool =
+            taceo_oprf::nodes_common::postgres::pg_pool_with_schema(config, CreateSchema::Yes)
+                .await
+                .context("while connecting to postgres DB")?;
         // We create the pool eagerly, so running migrations here should not hit pool-acquire retries.
         tracing::trace!("potentially running migrations..");
         sqlx::migrate!("./migrations")
@@ -98,9 +99,9 @@ impl ZkPassportDb {
         commitment: AuthCommitment,
     ) -> Result<(), DbError> {
         let identifier =
-            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier);
+            taceo_oprf::nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier);
         let commitment =
-            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment);
+            taceo_oprf::nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment);
         let register = || async {
             let inserted = sqlx::query(
                 "WITH registration AS (
@@ -142,9 +143,9 @@ impl ZkPassportDb {
         commitment: AuthCommitment,
     ) -> Result<(), DbError> {
         let identifier =
-            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier);
+            taceo_oprf::nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier);
         let commitment =
-            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment);
+            taceo_oprf::nodes_common::postgres::to_db_ark_serialize_uncompressed(&commitment);
         let rotate_transaction = || async {
             let mut tx = self.pool.begin().await?;
             sqlx::query_scalar::<_, Vec<u8>>(
@@ -187,7 +188,8 @@ impl ZkPassportDb {
         &self,
         identifier: SaltedIdentifier,
     ) -> Result<AuthCommitment, DbError> {
-        let id_bytes = taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier);
+        let id_bytes =
+            taceo_oprf::nodes_common::postgres::to_db_ark_serialize_uncompressed(&identifier);
         self.with_retry("fetch_commitment", || async {
             sqlx::query_scalar(
                 "SELECT commitment FROM passport_registrations WHERE salted_identifier = $1",
@@ -195,7 +197,7 @@ impl ZkPassportDb {
             .bind(id_bytes.as_slice())
             .fetch_optional(&self.pool)
             .await?
-            .map(taceo_nodes_common::postgres::from_db_ark_serialize_uncompressed)
+            .map(taceo_oprf::nodes_common::postgres::from_db_ark_serialize_uncompressed)
             .transpose()
             .map_err(DbError::from)
         })
@@ -247,8 +249,9 @@ fn is_retryable_error(e: &DbError) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use taceo_nodes_common::postgres::PostgresConfig;
-    use taceo_oprf::{core::oprf::BlindingFactor, types::ark_babyjubjub};
+    use taceo_oprf::{
+        core::oprf::BlindingFactor, nodes_common::postgres::PostgresConfig, types::ark_babyjubjub,
+    };
     use zkpassport_oprf_authentication::{AuthCommitment, SaltedIdentifier};
 
     use super::{DbError, ZkPassportDb, is_retryable_error};
@@ -258,13 +261,14 @@ mod tests {
         ///
         /// Keep the returned handle alive as long as the DB is used.
         pub(crate) async fn init_test() -> eyre::Result<(
-            std::sync::Arc<taceo_nodes_common::test_utils::SharedPostgres>,
+            std::sync::Arc<taceo_oprf::nodes_common::test_utils::SharedPostgres>,
             Self,
         )> {
-            let postgres = taceo_nodes_common::test_utils::shared_postgres_testcontainer().await?;
+            let postgres =
+                taceo_oprf::nodes_common::test_utils::shared_postgres_testcontainer().await?;
             let config = PostgresConfig::with_default_values(
                 postgres.connection_string.clone().into(),
-                taceo_nodes_common::test_utils::next_test_schema(),
+                taceo_oprf::nodes_common::test_utils::next_test_schema(),
             );
             let db = Self::init(&config).await?;
             Ok((postgres, db))
@@ -293,7 +297,7 @@ mod tests {
 
     /// All commitments in the history of `id`, sorted.
     async fn history(db: &ZkPassportDb, id: SaltedIdentifier) -> Vec<AuthCommitment> {
-        let id = taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(&id);
+        let id = taceo_oprf::nodes_common::postgres::to_db_ark_serialize_uncompressed(&id);
         let rows: Vec<Vec<u8>> = sqlx::query_scalar(
             "SELECT commitment FROM commitment_history WHERE salted_identifier = $1 ORDER BY commitment",
         )
@@ -303,7 +307,7 @@ mod tests {
         .expect("history query");
         rows.into_iter()
             .map(|b| {
-                taceo_nodes_common::postgres::from_db_ark_serialize_uncompressed(b)
+                taceo_oprf::nodes_common::postgres::from_db_ark_serialize_uncompressed(b)
                     .expect("valid commitment")
             })
             .collect()
@@ -311,7 +315,7 @@ mod tests {
 
     fn sorted(mut v: Vec<AuthCommitment>) -> Vec<AuthCommitment> {
         let key = |c: &AuthCommitment| {
-            taceo_nodes_common::postgres::to_db_ark_serialize_uncompressed(c).to_vec()
+            taceo_oprf::nodes_common::postgres::to_db_ark_serialize_uncompressed(c).to_vec()
         };
         v.sort_by_key(key);
         v

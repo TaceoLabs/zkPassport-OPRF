@@ -9,8 +9,8 @@ use std::{
 
 use axum::{Json, Router, http::StatusCode};
 use serde_json::json;
-use taceo_nodes_common::test_utils::{axum_test::TestServer, test_server};
 use taceo_oprf::{
+    nodes_common::test_utils::{axum_test::TestServer, test_server},
     service::{Environment, config::OprfNodeServiceConfig},
     types::ark_babyjubjub,
 };

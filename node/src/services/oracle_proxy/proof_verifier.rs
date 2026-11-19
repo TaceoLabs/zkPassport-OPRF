@@ -339,7 +339,7 @@ mod tests {
 
     use axum::{Json, Router, http::StatusCode as AxumStatus, routing::post};
     use serde_json::json;
-    use taceo_nodes_common::test_utils::{axum_test::TestServer, test_server};
+    use taceo_oprf::nodes_common::test_utils::{axum_test::TestServer, test_server};
 
     use super::*;
 

@@ -3153,22 +3153,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
-name = "humantime"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
-
-[[package]]
-name = "humantime-serde"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57a3db5ea5923d99402c94e9feb261dc5ee9b4efa158b0315f788cf549cc200c"
-dependencies = [
- "humantime",
- "serde",
-]
-
-[[package]]
 name = "hybrid-array"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5832,9 +5816,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-ark-serde-compat"
-version = "0.6.1"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f7a255d21a01f083cf373ff6b4903f9dafad1e0a2a1a2119a4cee971d1bb995"
+checksum = "0d338a8f08216a0982c20bd301f11a4fe620e99e8bdc6b8e8be20ec66eaf158d"
 dependencies = [
  "ark-ec",
  "ark-ff 0.6.0",
@@ -5874,10 +5858,11 @@ dependencies = [
 
 [[package]]
 name = "taceo-oprf"
-version = "0.19.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3934c2c370f9a617dd51c6ecd5b7f3353792ab7c26c7d30d7e7c98e209406b3c"
+checksum = "6275b75362e13ff22f2477fb4c00870054ee452f0fdc04269c76138656e1b809"
 dependencies = [
+ "taceo-nodes-common",
  "taceo-oprf-client",
  "taceo-oprf-core",
  "taceo-oprf-service",
@@ -5912,9 +5897,9 @@ dependencies = [
 
 [[package]]
 name = "taceo-oprf-core"
-version = "0.6.3"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f66b5a67d71a6022abb42198d87184aebbac1f45538b5858d22c87d0958a805"
+checksum = "a3ece709ebc11f1c461fd0401691e7264362e06ba6afa2318c007d5d44a3a36a"
 dependencies = [
  "ark-ec",
  "ark-ff 0.6.0",
@@ -5934,20 +5919,18 @@ dependencies = [
 
 [[package]]
 name = "taceo-oprf-service"
-version = "0.19.4"
+version = "0.19.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cfe1fd0b860233b43efab9cc5491c0e5a12f0483d05ae32880f0bb37b34bd9b"
+checksum = "57054728129112b3949fe2ce67c3011d1f78c5c01388d668ede1410f037a73db"
 dependencies = [
  "ark-ec",
- "ark-serialize 0.6.0",
  "async-trait",
  "axum",
  "axum-extra",
- "backon",
  "ciborium",
  "eyre",
  "http",
- "humantime-serde",
+ "jiff 1.0.0",
  "metrics",
  "moka",
  "parking_lot",
@@ -5961,7 +5944,9 @@ dependencies = [
  "taceo-nodes-common",
  "taceo-oprf-client",
  "taceo-oprf-core",
+ "taceo-oprf-store",
  "taceo-oprf-types",
+ "telemetry-batteries",
  "thiserror 2.0.21",
  "tokio",
  "tokio-util",
@@ -5969,14 +5954,30 @@ dependencies = [
  "tracing",
  "tungstenite",
  "uuid",
+]
+
+[[package]]
+name = "taceo-oprf-store"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46ae436f574f485b556f28ca8035580a7fe3a8ae64271f5e8775ac153f9d5db7"
+dependencies = [
+ "ark-serialize 0.6.0",
+ "backon",
+ "sqlx",
+ "taceo-oprf-core",
+ "taceo-oprf-types",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
  "zeroize",
 ]
 
 [[package]]
 name = "taceo-oprf-types"
-version = "0.16.2"
+version = "0.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "581efc3d8650576d3338d155d7dd42132f6012105a57fa6a2a3729fc68b203a6"
+checksum = "f1a1a58a2639c499cddde9ed153fa7fd464d4d468afb5f126ae9658d602e4194"
 dependencies = [
  "ark-ff 0.6.0",
  "ark-serialize 0.6.0",
@@ -6054,7 +6055,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
- "taceo-nodes-common",
  "taceo-oprf",
  "taceo-zkpassport-oprf-authentication",
  "taceo-zkpassport-oprf-test-utils",

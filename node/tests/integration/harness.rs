@@ -15,16 +15,16 @@ use axum::{
 use ruint::aliases::U160;
 use serde::Serialize;
 use serde_json::json;
-use taceo_nodes_common::{
-    postgres::PostgresConfig,
-    test_utils::{
-        SharedPostgres, axum_test::TestServer, next_test_schema, shared_postgres_testcontainer,
-        test_server,
-    },
-};
 use taceo_oprf::{
     client::{Connector, Error, ServiceError, VerifiableOprfOutput},
     core::{ddlog_equality::shamir::DLogShareShamir, oprf::BlindingFactor},
+    nodes_common::{
+        postgres::PostgresConfig,
+        test_utils::{
+            SharedPostgres, axum_test::TestServer, next_test_schema, shared_postgres_testcontainer,
+            test_server,
+        },
+    },
     service::{
         Environment,
         config::OprfNodeServiceConfig,

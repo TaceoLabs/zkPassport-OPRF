@@ -15,8 +15,6 @@ use zkpassport_oprf_authentication::{
     AuthCommitment, AuthErrorKind, SaltedIdentifier, ZKPassportProofResult,
 };
 
-use crate::metrics;
-
 pub(crate) mod proof_verifier;
 #[cfg(test)]
 pub(crate) mod test;
@@ -62,7 +60,6 @@ impl OracleError {
         if matches!(self, Self::BadRequest(_)) {
             tracing::warn!(err=?self, auth_error = true, "{self}");
         } else if matches!(self, Self::Overloaded(_)) {
-            metrics::oracle::inc_too_many_requests();
             tracing::warn!(err=?self, "{self}");
         } else {
             tracing::error!(err=?self, "{self}");

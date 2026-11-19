@@ -150,7 +150,9 @@ impl ProofVerifierOracle {
         tracing::trace!("sending verify request to oracle: {url}");
         (|| async {
             let (status, body) = {
-                let _permit = self.permits.try_acquire()?;
+                let _permit = self.permits.try_acquire().inspect_err(|_| {
+                    metrics::oracle::inc_too_many_requests();
+                })?;
                 let response = self.client.post(url.clone()).json(body).send().await?;
                 let status = response.status();
                 if status == StatusCode::OK {
@@ -434,9 +436,26 @@ mod tests {
 
     #[tokio::test]
     async fn face_match_timeout_test() -> eyre::Result<()> {
-        let (_server, oracle) = mock_oracle(AxumStatus::REQUEST_TIMEOUT, json!({}))?;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let app = Router::new().route(
+            &format!("/{FACE_MATCH_PATH}"),
+            post({
+                let calls = Arc::clone(&calls);
+                move || async move {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    (AxumStatus::REQUEST_TIMEOUT, Json(json!({})))
+                }
+            }),
+        );
+        let retry = RetryLayerConfig {
+            verifier_request_min_delay: Duration::from_millis(1),
+            verifier_request_max_delay: Duration::from_millis(1),
+            verifier_request_max_attempts: 2,
+        };
+        let (_server, oracle) = serve(app, retry)?;
         let err = face_match(&oracle).await.expect_err("Should fail");
         assert!(matches!(err, OracleError::OracleTimeout));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
         Ok(())
     }
 

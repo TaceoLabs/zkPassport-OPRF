@@ -77,7 +77,6 @@ ignore = [
   { id = "RUSTSEC-2026-0440", reason = "astral-tokio-tar is unmaintained, only used by testcontainers in tests" },
   { id = "RUSTSEC-2026-0441", reason = "pin-utils is unmaintained, locked by wasmtimer (alloy). Update when possible" },
   { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained. Pulled in by telemetry-batteries and axum-test (expect-json). Wait for upstream." },
-  { id = "RUSTSEC-2026-0542", reason = "humantime is unmaintained. Pulled in by taceo-nodes-common and taceo-oprf-service. Wait for upstream." },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
@@ -92,22 +91,7 @@ ignore = [
 # List of explicitly allowed licenses
 # See https://spdx.org/licenses/ for list of possible licenses
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
-allow = [
-  "MIT",
-  "Apache-2.0",
-  "Apache-2.0 WITH LLVM-exception",
-  "Unicode-3.0",
-  "BSD-2-Clause",
-  "BSD-3-Clause",
-  "ISC",
-  "MPL-2.0",
-  "Zlib",
-  "OpenSSL",
-  "CDLA-Permissive-2.0",
-  "Unlicense",
-  "0BSD",
-  "CC0-1.0"
-]
+allow = ["MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "Unicode-3.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MPL-2.0", "Zlib", "OpenSSL", "CDLA-Permissive-2.0", "Unlicense", "0BSD", "CC0-1.0"]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
 # canonical license text of a valid SPDX license file.

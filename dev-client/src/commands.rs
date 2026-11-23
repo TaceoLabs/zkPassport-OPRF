@@ -26,10 +26,18 @@ pub(crate) async fn smoke(
     let fixtures = load_v2_fixtures();
 
     tracing::info!("identify");
-    client
+    let expected_key = client
+        .oprf_public_key(identifier_oprf_key_id())
+        .await
+        .context("load identifier public key")?;
+    let identify_key = client
         .identify(&fixtures.identify)
         .await
         .context("identify")?;
+    eyre::ensure!(
+        identify_key == expected_key,
+        "identify returned a different public key or epoch than the nodes serve for the identifier key"
+    );
 
     tracing::info!("register");
     let statuses = client.register(&fixtures.register).await?;

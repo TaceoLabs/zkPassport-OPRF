@@ -74,9 +74,9 @@ The `dev-client` runs the fixtures against nodes given with `--nodes <url>,<url>
 
 | Environment | Command |
 |---|---|
-| `dev` (`devmode=true`, the fixtures verify) | `just run-dev-client smoke`, repeatable |
+| `dev` (`devmode=true`, the fixtures verify) | `just run-dev-client smoke`: verifies that identify returns the deployed identifier key, then runs the rest of the smoke flow. Repeatable |
 | `dev`, load test | `just run-dev-client stress identify --concurrency 10 --requests 100`, `stress nullifier` |
-| other (`devmode=false`) | `just run-dev-client smoke --prod`: checks that the nodes are up and the verifier rejects the fixture proofs, writes nothing |
+| other (`devmode=false`) | `just run-dev-client smoke --prod`: checks that the nodes are up, serve the deployed identifier key, and reject the fixture proofs |
 
 The fixtures allow one rotation per node database. Only the end-to-end test rotates, and it targets the local setup. Afterwards `smoke` and `stress nullifier` fail on that setup until it is restarted.
 

@@ -18,7 +18,7 @@ use taceo_oprf::{
 use uuid::Uuid;
 use zkpassport_oprf_authentication::{
     AuthModules, CommitmentRotationRequest, FaceMatchRequestAuth, IdentifyRequestAuth,
-    NullifierRequestAuth, RegistrationRequest,
+    NonIdentifierOprfKeyId, NullifierRequestAuth, RegistrationRequest,
 };
 
 use crate::fixtures::{CommitmentFixture, IdentifyFixture, QueryFixture, load_fixture_data};
@@ -59,7 +59,7 @@ impl NodeClient {
         })
     }
 
-    /// OPRF evaluation of the registration key for `fixture`. Returns the key the nodes used.
+    /// OPRF evaluation of the identifier key for `fixture`. Returns the key the nodes used.
     pub async fn identify(
         &self,
         fixture: &IdentifyFixture,
@@ -72,7 +72,7 @@ impl NodeClient {
     /// OPRF evaluation of the key `oprf_key_id` for `fixture`. Returns the key the nodes used.
     pub async fn nullifier(
         &self,
-        oprf_key_id: OprfKeyId,
+        oprf_key_id: NonIdentifierOprfKeyId,
         fixture: &QueryFixture,
     ) -> Result<OprfPublicKeyWithEpoch, Error> {
         let auth = NullifierRequestAuth {
@@ -88,7 +88,7 @@ impl NodeClient {
     /// nodes used.
     pub async fn face_match(
         &self,
-        oprf_key_id: OprfKeyId,
+        oprf_key_id: NonIdentifierOprfKeyId,
     ) -> Result<OprfPublicKeyWithEpoch, Error> {
         let fixture = load_fixture_data();
         let blinding_factor = BlindingFactor::from_scalar(fixture.beta)

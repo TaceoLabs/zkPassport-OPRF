@@ -41,8 +41,8 @@ use taceo_oprf::{
 use taceo_zkpassport_oprf_node::{ProofVerifierOracle, ZkPassportDb, config::RetryLayerConfig};
 use zkpassport_oprf_authentication::{
     AuthCommitment, AuthModules, CommitmentRotationRequest, FaceMatchRequestAuth,
-    IdentifyRequestAuth, NullifierRequestAuth, RegistrationRequest, SaltedIdentifier,
-    ZKPassportProofResult, registration_oprf_key_id,
+    IdentifyRequestAuth, NonIdentifierOprfKeyId, NullifierRequestAuth, RegistrationRequest,
+    SaltedIdentifier, ZKPassportProofResult, identifier_oprf_key_id,
 };
 
 /// The private nullifier `pn` of the test passport.
@@ -96,8 +96,11 @@ impl TestNode {
         let secret_manager = InMemorySecretManager {
             node_information: node_information.clone(),
             keys: HashMap::from([
-                (registration_oprf_key_id(), key_material(Fr::from(11u64))),
-                (customer_key_id(), key_material(Fr::from(12u64))),
+                (identifier_oprf_key_id(), key_material(Fr::from(11u64))),
+                (
+                    OprfKeyId::from(customer_key_id()),
+                    key_material(Fr::from(12u64)),
+                ),
             ]),
         };
 
@@ -158,7 +161,7 @@ impl TestNode {
         .await
     }
 
-    /// First registration step: evaluates `pn` under the registration key.
+    /// First registration step: evaluates `pn` under the identifier key.
     pub(crate) async fn identify_oprf(&self, pn: u64) -> Result<VerifiableOprfOutput, Error> {
         self.oprf(
             AuthModules::Identify,
@@ -172,7 +175,7 @@ impl TestNode {
     pub(crate) async fn nullifier_oprf(
         &self,
         pn: u64,
-        oprf_key_id: OprfKeyId,
+        oprf_key_id: NonIdentifierOprfKeyId,
         salted_identifier: SaltedIdentifier,
     ) -> Result<VerifiableOprfOutput, Error> {
         let auth = NullifierRequestAuth {
@@ -187,7 +190,7 @@ impl TestNode {
     pub(crate) async fn face_match_oprf(
         &self,
         query: u64,
-        oprf_key_id: OprfKeyId,
+        oprf_key_id: NonIdentifierOprfKeyId,
     ) -> Result<VerifiableOprfOutput, Error> {
         let auth = FaceMatchRequestAuth::new(oprf_key_id, proofs());
         self.oprf(AuthModules::FaceMatch, query, auth).await
@@ -321,9 +324,9 @@ impl FakeVerifier {
     }
 }
 
-/// OPRF key of a zkPassport customer, held by the node next to the registration key.
-pub(crate) fn customer_key_id() -> OprfKeyId {
-    OprfKeyId::new(U160::from(42))
+/// OPRF key of a zkPassport customer, held by the node next to the identifier key.
+pub(crate) fn customer_key_id() -> NonIdentifierOprfKeyId {
+    NonIdentifierOprfKeyId::new(U160::from(42)).expect("not the identifier key")
 }
 
 pub(crate) fn commitment(n: u64) -> AuthCommitment {

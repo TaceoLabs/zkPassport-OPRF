@@ -44,8 +44,8 @@ async fn v2_lifecycle() -> eyre::Result<()> {
 
     assert_eq!(client.identify(&fixtures.identify).await?, identifier_key);
     // the dev-client may have registered the fixture on these nodes
-    let statuses = client.register(&fixtures.register).await?;
-    expect_statuses(&statuses, &[StatusCode::OK, StatusCode::CONFLICT])?;
+    let responses = client.register(&fixtures.register).await?;
+    expect_statuses(&responses, &[StatusCode::OK, StatusCode::CONFLICT])?;
     assert_eq!(
         client.nullifier(customer_key_id, &fixtures.query).await?,
         customer_key
@@ -69,25 +69,25 @@ async fn v2_lifecycle() -> eyre::Result<()> {
         commitment: fixtures.rotate.commitment,
         ..fixtures.register.clone()
     };
-    let statuses = client.register(&wrong_commitment).await?;
-    expect_statuses(&statuses, &[StatusCode::BAD_REQUEST])?;
+    let responses = client.register(&wrong_commitment).await?;
+    expect_statuses(&responses, &[StatusCode::BAD_REQUEST])?;
     let wrong_proofs = CommitmentFixture {
         proofs: fixtures.register.proofs.clone(),
         ..fixtures.rotate.clone()
     };
-    let statuses = client.rotate(&wrong_proofs).await?;
-    expect_statuses(&statuses, &[StatusCode::BAD_REQUEST])?;
+    let responses = client.rotate(&wrong_proofs).await?;
+    expect_statuses(&responses, &[StatusCode::BAD_REQUEST])?;
 
-    let statuses = client.rotate(&fixtures.rotate).await?;
-    expect_statuses(&statuses, &[StatusCode::OK])?;
+    let responses = client.rotate(&fixtures.rotate).await?;
+    expect_statuses(&responses, &[StatusCode::OK])?;
 
     // the query fixture still carries the replaced commitment
     let result = client.nullifier(customer_key_id, &fixtures.query).await;
     expect_rejected(result, error_codes::ORACLE_BAD_REQUEST)?;
     // replays change nothing
-    let statuses = client.register(&fixtures.register).await?;
-    expect_statuses(&statuses, &[StatusCode::CONFLICT])?;
-    let statuses = client.rotate(&fixtures.rotate).await?;
-    expect_statuses(&statuses, &[StatusCode::CONFLICT])?;
+    let responses = client.register(&fixtures.register).await?;
+    expect_statuses(&responses, &[StatusCode::CONFLICT])?;
+    let responses = client.rotate(&fixtures.rotate).await?;
+    expect_statuses(&responses, &[StatusCode::CONFLICT])?;
     Ok(())
 }

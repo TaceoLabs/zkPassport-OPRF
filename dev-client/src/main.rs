@@ -45,11 +45,13 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Runs the v2 flow without the rotation. Can be repeated, but fails on nodes where the
-    /// rotation of the fixture ran.
+    /// Runs the v2 flow without the rotation, or only the given steps in the given order. Can be
+    /// repeated, but fails on nodes where the rotation of the fixture ran.
     Smoke {
+        /// The steps to run. All steps if empty
+        steps: Vec<SmokeStep>,
         /// For nodes outside the `dev` environment: checks that they are up and reject the
-        /// fixture proofs.
+        /// fixture proofs, and writes nothing. Supports the steps `online` and `identify`
         #[clap(long)]
         prod: bool,
     },
@@ -65,6 +67,18 @@ enum Command {
         #[clap(long, default_value = "100")]
         requests: NonZeroUsize,
     },
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum SmokeStep {
+    /// Every node is healthy and the nodes agree on the public keys
+    Online,
+    Identify,
+    /// Registers the fixture. Succeeds if it is already registered
+    Register,
+    /// Needs the fixture to be registered
+    Query,
+    FaceMatch,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
@@ -86,8 +100,7 @@ async fn main() -> eyre::Result<()> {
         .ok_or_else(|| eyre::eyre!("--oprf-key-id cannot be the identifier OPRF key"))?;
     let client = NodeClient::new(cli.nodes, cli.threshold)?;
     match cli.command {
-        Command::Smoke { prod: true } => commands::smoke_prod(&client, oprf_key_id).await,
-        Command::Smoke { prod: false } => commands::smoke(&client, oprf_key_id).await,
+        Command::Smoke { steps, prod } => commands::smoke(&client, oprf_key_id, steps, prod).await,
         Command::Stress {
             request,
             concurrency,

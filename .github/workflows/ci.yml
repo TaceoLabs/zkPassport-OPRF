@@ -73,7 +73,7 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
-      - run: cd contracts && forge install && forge build
+      - run: cd contracts && forge soldeer install && forge build
       - name: Run E2E Test
         run: bash run-setup.sh e2e-test
 

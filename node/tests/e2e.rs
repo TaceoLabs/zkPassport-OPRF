@@ -8,7 +8,7 @@ use std::num::NonZeroUsize;
 use reqwest::StatusCode;
 use ruint::aliases::U160;
 use taceo_oprf::types::OprfKeyId;
-use zkpassport_oprf_authentication::{NonIdentifierOprfKeyId, error_codes, identifier_oprf_key_id};
+use zkpassport_oprf_authentication::{IDENTIFIER_OPRF_KEY_ID, NonIdentifierOprfKeyId, error_codes};
 use zkpassport_oprf_test_utils::{
     fixtures::{CommitmentFixture, IdentifyFixture, load_v2_fixtures},
     node_client::{NodeClient, expect_rejected, expect_statuses},
@@ -36,7 +36,7 @@ async fn v2_lifecycle() -> eyre::Result<()> {
         .expect("not the identifier key");
     let fixtures = load_v2_fixtures();
 
-    let identifier_key = client.oprf_public_key(identifier_oprf_key_id()).await?;
+    let identifier_key = client.oprf_public_key(IDENTIFIER_OPRF_KEY_ID).await?;
     let customer_key = client
         .oprf_public_key(OprfKeyId::from(customer_key_id))
         .await?;

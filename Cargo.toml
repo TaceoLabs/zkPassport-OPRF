@@ -30,7 +30,7 @@ rustls = "0.23"
 serde = { version = "1" }
 serde_json = { version = "1" }
 sqlx = { version = "0.9" }
-taceo-oprf = { version = "0.21", default-features = false }
+taceo-oprf = { version = "0.22", default-features = false }
 telemetry-batteries = { version = "0.4.1", default-features = false }
 thiserror = { version = "2" }
 tikv-jemallocator = "0.7"

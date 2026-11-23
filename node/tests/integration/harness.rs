@@ -41,8 +41,8 @@ use taceo_oprf::{
 use taceo_zkpassport_oprf_node::{ProofVerifierOracle, ZkPassportDb, config::RetryLayerConfig};
 use zkpassport_oprf_authentication::{
     AuthCommitment, AuthModules, CommitmentRotationRequest, FaceMatchRequestAuth,
-    IdentifyRequestAuth, NonIdentifierOprfKeyId, NullifierRequestAuth, RegistrationRequest,
-    SaltedIdentifier, ZKPassportProofResult, identifier_oprf_key_id,
+    IDENTIFIER_OPRF_KEY_ID, IdentifyRequestAuth, NonIdentifierOprfKeyId, NullifierRequestAuth,
+    RegistrationRequest, SaltedIdentifier, ZKPassportProofResult,
 };
 
 /// The private nullifier `pn` of the test passport.
@@ -96,7 +96,7 @@ impl TestNode {
         let secret_manager = InMemorySecretManager {
             node_information: node_information.clone(),
             keys: HashMap::from([
-                (identifier_oprf_key_id(), key_material(Fr::from(11u64))),
+                (IDENTIFIER_OPRF_KEY_ID, key_material(Fr::from(11u64))),
                 (
                     OprfKeyId::from(customer_key_id()),
                     key_material(Fr::from(12u64)),

@@ -12,7 +12,10 @@ use eyre::Context as _;
 use serde::Deserialize;
 use taceo_oprf::{
     nodes_common::{default_shutdown_signal, postgres::PostgresConfig, spawn_shutdown_task},
-    service::secret_manager::{SecretManager, postgres::PostgresSecretManager},
+    service::secret_manager::{
+        SecretManager,
+        postgres::{PostgresSecretManager, StorageReadConfig},
+    },
     types::service::NodeInformation,
 };
 use taceo_zkpassport_oprf_node::{
@@ -47,6 +50,9 @@ struct FullZkPassportNodeConfig {
     /// The postgres config for the secret-manager
     #[serde(rename = "oprf_keys_postgres")]
     pub postgres_secret_manager_config: PostgresConfig,
+    /// The storage formats the node reads OPRF key shares in. Defaults to `direct` only.
+    #[serde(rename = "storage", default)]
+    pub storage_config: StorageReadConfig,
     /// The postgres config for the registered users
     #[serde(rename = "users_postgres")]
     pub zkpassport_postgres_config: PostgresConfig,
@@ -121,9 +127,12 @@ async fn run(config: FullZkPassportNodeConfig) -> eyre::Result<()> {
     // Load the postgres secret manager.
     tracing::info!("connect to postgres secret-manager..");
     let secret_manager = Arc::new(
-        PostgresSecretManager::init(&config.postgres_secret_manager_config)
-            .await
-            .context("while starting postgres secret-manager")?,
+        PostgresSecretManager::init(
+            &config.postgres_secret_manager_config,
+            &config.storage_config,
+        )
+        .await
+        .context("while starting postgres secret-manager")?,
     );
 
     tracing::info!("connect to postgres zk-passport DB..");

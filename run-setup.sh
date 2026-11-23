@@ -2,13 +2,16 @@
 
 set -eu
 
+# The fixed identifier key ID, U160::MAX (see `identifier_oprf_key_id` in the authentication crate).
+readonly IDENTIFIER_OPRF_KEY_ID=0xffffffffffffffffffffffffffffffffffffffff
+
 NOCOLOR='\033[0m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 
 PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
-# the key of the registration OPRF used to generate the v2 fixtures, pinned in the proof-verifier
+# the identifier OPRF public key used to generate the v2 fixtures, pinned in the proof-verifier
 OPRF_REGISTRATION_PUBLIC_KEY=$(jq -r .OPRF_REGISTRATION_PUBLIC_KEY test-utils/fixtures/oprf-v2/meta.json)
 export OPRF_REGISTRATION_PUBLIC_KEY
 
@@ -147,12 +150,13 @@ setup() {
     wait_for_health 10001 "taceo-zkpassport-oprf-node1" 300
     wait_for_health 10002 "taceo-zkpassport-oprf-node2" 300
 
-    echo -e "${GREEN}init the registration (1) and the customer (2) OPRF key..${NOCOLOR}"
-    for oprf_key_id in 1 2; do
+    local oprf_key_ids=("$IDENTIFIER_OPRF_KEY_ID" 2)
+    echo -e "${GREEN}initializing the identifier and customer OPRF keys..${NOCOLOR}"
+    for oprf_key_id in "${oprf_key_ids[@]}"; do
         (cd contracts && OPRF_KEY_REGISTRY_PROXY=$oprf_key_registry OPRF_KEY_ID=$oprf_key_id forge script script/InitKeyGen.s.sol --broadcast --fork-url http://127.0.0.1:8545 --private-key $PK)
     done
 
-    for oprf_key_id in 1 2; do
+    for oprf_key_id in "${oprf_key_ids[@]}"; do
         wait_for_oprf_pub 10000 $oprf_key_id 300
         wait_for_oprf_pub 10001 $oprf_key_id 300
         wait_for_oprf_pub 10002 $oprf_key_id 300

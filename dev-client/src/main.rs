@@ -14,8 +14,8 @@ use std::num::NonZeroUsize;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use ruint::aliases::U160;
-use taceo_oprf::types::OprfKeyId;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _};
+use zkpassport_oprf_authentication::NonIdentifierOprfKeyId;
 use zkpassport_oprf_test_utils::node_client::NodeClient;
 
 mod commands;
@@ -49,7 +49,7 @@ enum Command {
     /// rotation of the fixture ran.
     Smoke {
         /// For nodes outside the `dev` environment: checks that they are up and reject the
-        /// fixture proofs, and writes nothing
+        /// fixture proofs.
         #[clap(long)]
         prod: bool,
     },
@@ -82,11 +82,12 @@ async fn main() -> eyre::Result<()> {
     let cli = Cli::parse();
     tracing::info!("starting oprf-dev-client with config: {cli:#?}");
 
-    let oprf_key_id = OprfKeyId::new(cli.oprf_key_id);
+    let oprf_key_id = NonIdentifierOprfKeyId::new(cli.oprf_key_id)
+        .ok_or_else(|| eyre::eyre!("--oprf-key-id cannot be the identifier OPRF key"))?;
     let client = NodeClient::new(cli.nodes, cli.threshold)?;
     match cli.command {
-        Command::Smoke { prod: false } => commands::smoke(&client, oprf_key_id).await,
         Command::Smoke { prod: true } => commands::smoke_prod(&client, oprf_key_id).await,
+        Command::Smoke { prod: false } => commands::smoke(&client, oprf_key_id).await,
         Command::Stress {
             request,
             concurrency,

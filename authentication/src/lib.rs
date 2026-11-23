@@ -6,7 +6,7 @@
 //! * [`FaceMatchRequestAuth`] — the authentication payload sent by a client,
 //!   containing an OPRF key ID and a list of zkPassport proofs.
 //! * [`IdentifyRequestAuth`] — the authentication payload for passport
-//!   identification, which always uses the [`registration_oprf_key_id`].
+//!   identification, which always uses the [`identifier_oprf_key_id`].
 //! * [`NullifierRequestAuth`] — the authentication payload for nullifier
 //!   derivation for a registered [`SaltedIdentifier`].
 //! * [`ZKPassportProofResult`] — a single zkPassport proof matching the
@@ -14,7 +14,7 @@
 //! * [`AuthModules`] — an enum of supported authentication modules
 //!   (`FaceMatch`, `Identify` and `Nullifier`).
 //! * [`RegistrationRequest`] — the request to register an identifier and
-//!   commitment after the registration OPRF evaluation.
+//!   commitment after the identifier OPRF evaluation.
 //! * [`AuthErrorKind`] — authentication error variants with numeric
 //!   [`error_codes`] and conversions to the upstream
 //!   `OprfRequestAuthenticatorError`.
@@ -108,20 +108,6 @@ pub struct CommitmentRotationRequest {
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
-/// Raw value of the global OPRF key used to derive user identifiers during registration.
-///
-/// See [`registration_oprf_key_id`].
-// TODO: replace the placeholder with the final key id.
-pub const REGISTRATION_OPRF_KEY_ID: U160 = U160::from_limbs([1, 0, 0]);
-
-/// The global OPRF key used to derive user identifiers during registration.
-///
-/// The registration module always evaluates the OPRF under this key.
-#[must_use]
-pub fn registration_oprf_key_id() -> OprfKeyId {
-    OprfKeyId::new(REGISTRATION_OPRF_KEY_ID)
-}
-
 /// Identifies the authentication module used for an OPRF request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -129,7 +115,7 @@ pub enum AuthModules {
     /// Face-match authentication using zkPassport zero-knowledge proofs.
     FaceMatch,
     /// First registration step, deriving the salted identifier under the
-    /// [`registration_oprf_key_id`].
+    /// [`identifier_oprf_key_id`].
     Identify,
     /// Default nullifier authentication module proving knowledge of a secret in zk.
     Nullifier,
@@ -153,9 +139,8 @@ impl core::fmt::Display for AuthModules {
 #[derive(Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct FaceMatchRequestAuth {
-    /// The OPRF key to use for this request. Must not be the [`registration_oprf_key_id`]
-    /// (rejected with [`AuthErrorKind::RequestedOprfRegistrationKey`]).
-    pub oprf_key_id: OprfKeyId,
+    /// The OPRF key to use for this request.
+    pub oprf_key_id: NonIdentifierOprfKeyId,
     /// zkPassport proofs that attest to the user's identity.
     pub proofs: Vec<ZKPassportProofResult>,
 }
@@ -163,7 +148,7 @@ pub struct FaceMatchRequestAuth {
 impl FaceMatchRequestAuth {
     /// Creates a new `FaceMatchRequestAuth`.
     #[must_use]
-    pub fn new(oprf_key_id: OprfKeyId, proofs: Vec<ZKPassportProofResult>) -> Self {
+    pub fn new(oprf_key_id: NonIdentifierOprfKeyId, proofs: Vec<ZKPassportProofResult>) -> Self {
         Self {
             oprf_key_id,
             proofs,
@@ -173,9 +158,8 @@ impl FaceMatchRequestAuth {
 
 /// Authentication payload attached to an identify OPRF request.
 ///
-/// The client cannot choose the OPRF key: the OPRF node always uses the
-/// [`registration_oprf_key_id`], and verifies the embedded proofs before
-/// proceeding with the OPRF evaluation.
+/// The node verifies the embedded proofs before evaluating the OPRF with the
+/// [`identifier_oprf_key_id`].
 #[derive(Clone, Serialize, Deserialize)]
 pub struct IdentifyRequestAuth {
     /// zkPassport proofs that attest to the user's passport.
@@ -190,7 +174,7 @@ impl IdentifyRequestAuth {
     }
 }
 
-/// Request when registering an identifier after the registration OPRF evaluation.
+/// Request when registering an identifier after the identifier OPRF evaluation.
 ///
 /// Sent by the client to every OPRF node after it derived its identifier with the
 /// [`AuthModules::Identify`] module. The node verifies the proofs, then stores
@@ -203,26 +187,71 @@ pub struct RegistrationRequest {
     /// The commitment to persist in the database
     pub commitment: AuthCommitment,
     /// zkPassport proofs, including the client's OPRF proof that `I` is the output of the
-    /// registration OPRF evaluation
+    /// identifier OPRF evaluation
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
 /// Authentication payload attached to a nullifier OPRF request.
 ///
-/// The client chooses the OPRF key, which must not be the
-/// [`registration_oprf_key_id`] (rejected with
-/// [`AuthErrorKind::RequestedOprfRegistrationKey`]). The OPRF node looks up the
+/// The client chooses the OPRF key. The OPRF node looks up the
 /// commitment stored for `I` and verifies the embedded proofs before proceeding
 /// with the OPRF evaluation.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct NullifierRequestAuth {
-    /// The requested `OprfKeyId`.
-    pub oprf_key_id: OprfKeyId,
+    /// The requested OPRF key.
+    pub oprf_key_id: NonIdentifierOprfKeyId,
     /// The registered identifier `I` of the user.
     #[serde(rename = "I")]
     pub salted_identifier: SaltedIdentifier,
     /// Proofs of knowledge of the preimage of the commitment stored for `I`.
     pub proofs: Vec<ZKPassportProofResult>,
+}
+
+/// The OPRF key ID reserved for deriving identifiers, fixed to [`U160::MAX`].
+///
+/// Every deployment registers the identifier key under this ID. Changing it changes every
+/// user's identifier.
+#[must_use]
+pub fn identifier_oprf_key_id() -> OprfKeyId {
+    OprfKeyId::new(U160::MAX)
+}
+
+/// An [`OprfKeyId`] chosen by a client, which cannot be the [`identifier_oprf_key_id`].
+///
+/// Has the wire format of [`OprfKeyId`], but deserialization fails for the identifier key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "OprfKeyId", into = "OprfKeyId")]
+pub struct NonIdentifierOprfKeyId(OprfKeyId);
+
+impl NonIdentifierOprfKeyId {
+    /// Creates a `NonIdentifierOprfKeyId` if `id` is not the [`identifier_oprf_key_id`].
+    #[must_use]
+    pub fn new(id: U160) -> Option<Self> {
+        Self::try_from(OprfKeyId::new(id)).ok()
+    }
+}
+
+/// The [`OprfKeyId`] is the [`identifier_oprf_key_id`].
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("the identifier OPRF key cannot be requested")]
+pub struct IdentifierKeyRequested;
+
+impl TryFrom<OprfKeyId> for NonIdentifierOprfKeyId {
+    type Error = IdentifierKeyRequested;
+
+    fn try_from(id: OprfKeyId) -> Result<Self, Self::Error> {
+        if id == identifier_oprf_key_id() {
+            Err(IdentifierKeyRequested)
+        } else {
+            Ok(Self(id))
+        }
+    }
+}
+
+impl From<NonIdentifierOprfKeyId> for OprfKeyId {
+    fn from(id: NonIdentifierOprfKeyId) -> Self {
+        id.0
+    }
 }
 
 /// A single zkPassport proof, matching the `ProofResult` type from `@zkpassport/utils`.
@@ -267,9 +296,6 @@ pub enum AuthErrorKind {
     /// The oracle service responded with BAD REQUEST.
     #[error("oracle_bad_request")]
     OracleBadRequest(String),
-    /// Requested the OPRF registration key in a module where the client chooses the key.
-    #[error("request_oprf_reg_key")]
-    RequestedOprfRegistrationKey,
     /// Request for an unknown [`SaltedIdentifier`].
     #[error("unknown_identifier")]
     UnknownIdentifier,
@@ -290,8 +316,6 @@ pub mod error_codes {
     pub const ORACLE_NOT_REACHABLE: u16 = 4500;
     /// Error code for [`super::AuthErrorKind::OracleBadRequest`].
     pub const ORACLE_BAD_REQUEST: u16 = 4501;
-    /// Error code for [`super::AuthErrorKind::RequestedOprfRegistrationKey`].
-    pub const REQUESTED_OPRF_REGISTRATION_KEY: u16 = 4502;
     /// Error code for [`super::AuthErrorKind::UnknownIdentifier`].
     pub const UNKNOWN_IDENTIFIER: u16 = 4503;
     /// Error code for [`super::AuthErrorKind::OracleTimeout`].
@@ -307,9 +331,6 @@ impl From<AuthErrorKind> for u16 {
         match value {
             AuthErrorKind::OracleNotReachable => error_codes::ORACLE_NOT_REACHABLE,
             AuthErrorKind::OracleBadRequest(_) => error_codes::ORACLE_BAD_REQUEST,
-            AuthErrorKind::RequestedOprfRegistrationKey => {
-                error_codes::REQUESTED_OPRF_REGISTRATION_KEY
-            }
             AuthErrorKind::UnknownIdentifier => error_codes::UNKNOWN_IDENTIFIER,
             AuthErrorKind::OracleTimeout => error_codes::ORACLE_TIMEOUT,
             AuthErrorKind::Overloaded => error_codes::OVERLOADED,
@@ -326,9 +347,6 @@ impl From<AuthErrorKind> for OprfRequestAuthenticatorError {
             }
             AuthErrorKind::OracleBadRequest(reason) => {
                 CloseFrameMessage::new_truncate(reason.to_owned())
-            }
-            AuthErrorKind::RequestedOprfRegistrationKey => {
-                taceo_oprf::types::close_frame_message!("cannot request for registration OPRF key")
             }
             AuthErrorKind::UnknownIdentifier => {
                 taceo_oprf::types::close_frame_message!("unknown identifier")
@@ -435,7 +453,8 @@ mod tests {
     #[test]
     fn nullifier_request_auth_wire_format() {
         let auth = NullifierRequestAuth {
-            oprf_key_id: OprfKeyId::new(U160::from(7)),
+            oprf_key_id: NonIdentifierOprfKeyId::new(U160::from(7))
+                .expect("not the identifier key"),
             salted_identifier: identifier(),
             proofs: vec![],
         };
@@ -445,6 +464,19 @@ mod tests {
             "proofs": [],
         });
         assert_wire_format(&auth, &expected);
+    }
+
+    #[test]
+    fn identifier_oprf_key_id_is_u160_max() {
+        assert_eq!(identifier_oprf_key_id().into_inner(), U160::MAX);
+    }
+
+    #[test]
+    fn non_identifier_oprf_key_id_rejects_identifier_key() {
+        let identifier_key = json!(identifier_oprf_key_id());
+        serde_json::from_value::<NonIdentifierOprfKeyId>(identifier_key).expect_err("rejected");
+        let other = json!(OprfKeyId::new(U160::MAX - U160::from(1)));
+        serde_json::from_value::<NonIdentifierOprfKeyId>(other).expect("accepted");
     }
 
     #[test]
@@ -460,11 +492,6 @@ mod tests {
                 AuthErrorKind::OracleBadRequest("invalid proof".to_owned()),
                 4501,
                 "invalid proof",
-            ),
-            (
-                AuthErrorKind::RequestedOprfRegistrationKey,
-                4502,
-                "cannot request for registration OPRF key",
             ),
             (AuthErrorKind::UnknownIdentifier, 4503, "unknown identifier"),
             (AuthErrorKind::Internal, 1011, "internal"),

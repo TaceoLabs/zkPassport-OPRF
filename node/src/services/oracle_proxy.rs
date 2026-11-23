@@ -95,12 +95,12 @@ impl From<OracleError> for AuthErrorKind {
 ///   deterministic per passport and never leaves a proof.
 /// - `r`: a nonzero blinding factor chosen by the user.
 /// - `B`: the blinded OPRF query, a blinding of `pn` under `r`.
-/// - `k_reg`: the global OPRF key, used for registration only.
+/// - `k_id`: the global OPRF key used to derive identifiers.
 /// - `k_c`: the nullifier OPRF key of a zkPassport customer.
-/// - `I = OPRF(pn, k_reg)`: the [`SaltedIdentifier`], a `BabyJubJub` point obtained by unblinding
-///   the registration response. It is independent of the blinding factor.
+/// - `I = OPRF(pn, k_id)`: the [`SaltedIdentifier`], a `BabyJubJub` point obtained by unblinding
+///   the identify response. It is independent of the blinding factor.
 /// - `pi`: the Chaum-Pedersen proof returned by the OPRF nodes, attesting to the correct
-///   evaluation under `k_reg`.
+///   evaluation under `k_id`.
 /// - `DS_COMMIT`: the ASCII string `zkpassport-oprf-v2-commit` interpreted as a
 ///   big-endian field element.
 /// - `commit(pn, s) = Poseidon2_t3([DS_COMMIT, pn, s])[1]`: the commitment to a secret `s`, where
@@ -134,14 +134,14 @@ impl From<OracleError> for AuthErrorKind {
 /// # Registration Proof
 ///
 /// The registration proof is the zkPassport `oprf_registration` circuit. It takes `P`, `I`, the
-/// public key of `k_reg` and the commitment `x'` as public inputs and establishes:
+/// public key of `k_id` and the commitment `x'` as public inputs and establishes:
 ///
 /// - The user knows the opening of `P`, in particular its salts and `pn`.
-/// - `pi` verifies against the public key of `k_reg`, authenticating a blinded query/response
-///   pair, and unblinding the response with `r` yields `I = OPRF(pn, k_reg)`.
+/// - `pi` verifies against the public key of `k_id`, authenticating a blinded query/response
+///   pair, and unblinding the response with `r` yields `I = OPRF(pn, k_id)`.
 /// - The user knows `x` with `x' = commit(pn, x)`.
 ///
-/// The oracle pins the public key of `k_reg`, so a client cannot use a key of its own. A user
+/// The oracle pins the public key of `k_id`, so a client cannot use a key of its own. A user
 /// obtains the inputs for `I` (`r`, the response and `pi`) after the first registration step (see
 /// `IdentifyAuthenticator`) and stacks the proof on the base proof in later requests.
 ///
@@ -153,7 +153,7 @@ pub trait OracleProxy {
     /// committed in `P`. First step of the registration process.
     ///
     /// Consumed by `IdentifyAuthenticator`,
-    /// which then evaluates the OPRF under `k_reg`.
+    /// which then evaluates the OPRF under `k_id`.
     ///
     /// # Proof Composition
     ///
@@ -175,7 +175,7 @@ pub trait OracleProxy {
     /// # Notes
     ///
     /// The subsequent registration proof already rejects any `I` not computed from `pn`, so §1 is
-    /// not required for soundness per se. It ensures the nodes never evaluate `k_reg` on arbitrary
+    /// not required for soundness per se. It ensures the nodes never evaluate `k_id` on arbitrary
     /// inputs.
     ///
     /// No `nonce`, `challenge`, or `timestamp` is added. Replaying the proof with the same request
@@ -241,7 +241,7 @@ pub trait OracleProxy {
     /// require `x'` to equal the commitment currently stored for `I`. This rejects both arbitrary
     /// commitments and commitments superseded by a rotation.
     ///
-    /// Nodes MUST reject requests for `k_reg`. The registration key is used exclusively for
+    /// Nodes MUST reject requests for `k_id`. The identifier key is used exclusively for
     /// computing identifiers.
     ///
     /// No `nonce`, `challenge`, or `timestamp` is needed. A replay is accepted only while `x'` is

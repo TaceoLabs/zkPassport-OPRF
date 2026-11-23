@@ -62,7 +62,7 @@ This will:
 2. Deploy the `OprfKeyRegistry` smart contract and register participants
 3. Start a verification oracle (proof-verifier) and 3 OPRF service nodes
 4. Start 3 OPRF key-gen instances (via Docker)
-5. Initialize the registration OPRF key (id 1) and a customer OPRF key (id 2)
+5. Initialize the identifier OPRF key (ID `2^160 - 1`) and a customer OPRF key (ID `2`)
 
 Log files for all processes are written to the `logs/` directory. Press `Ctrl+C` to tear down.
 
@@ -87,6 +87,8 @@ The OPRF node is configured via environment variables using a hierarchical prefi
 * **OPRF node:** `TACEO_OPRF_NODE__*` (e.g., `TACEO_OPRF_NODE__BIND_ADDR`, `TACEO_OPRF_NODE__SERVICE__OPRF__ENVIRONMENT`)
 
 OPRF key-gen instances are provided by the upstream [oprf-service](https://github.com/TaceoLabs/oprf-service) Docker images and configured via `TACEO_OPRF_KEY_GEN__*` environment variables.
+
+The identifier OPRF key ID is fixed to `2^160 - 1` (`U160::MAX`). Register the identifier key under this ID in every deployment. Requests for it through the face-match and nullifier modules fail to deserialize.
 
 See `run-setup.sh` for a complete example of all required environment variables.
 

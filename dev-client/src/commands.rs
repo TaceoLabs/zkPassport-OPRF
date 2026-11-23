@@ -11,7 +11,7 @@ use eyre::Context as _;
 use reqwest::StatusCode;
 use taceo_oprf::{client::Error, types::OprfKeyId};
 use tokio::{sync::Semaphore, task::JoinSet};
-use zkpassport_oprf_authentication::{error_codes, registration_oprf_key_id};
+use zkpassport_oprf_authentication::{NonIdentifierOprfKeyId, error_codes, identifier_oprf_key_id};
 use zkpassport_oprf_test_utils::{
     fixtures::load_v2_fixtures,
     node_client::{NodeClient, expect_rejected, expect_statuses},
@@ -19,7 +19,10 @@ use zkpassport_oprf_test_utils::{
 
 use crate::StressRequest;
 
-pub(crate) async fn smoke(client: &NodeClient, oprf_key_id: OprfKeyId) -> eyre::Result<()> {
+pub(crate) async fn smoke(
+    client: &NodeClient,
+    oprf_key_id: NonIdentifierOprfKeyId,
+) -> eyre::Result<()> {
     let fixtures = load_v2_fixtures();
 
     tracing::info!("identify");
@@ -43,10 +46,13 @@ pub(crate) async fn smoke(client: &NodeClient, oprf_key_id: OprfKeyId) -> eyre::
     Ok(())
 }
 
-pub(crate) async fn smoke_prod(client: &NodeClient, oprf_key_id: OprfKeyId) -> eyre::Result<()> {
+pub(crate) async fn smoke_prod(
+    client: &NodeClient,
+    oprf_key_id: NonIdentifierOprfKeyId,
+) -> eyre::Result<()> {
     tracing::info!("nodes are online");
     client
-        .check_online(&[registration_oprf_key_id(), oprf_key_id])
+        .check_online(&[identifier_oprf_key_id(), OprfKeyId::from(oprf_key_id)])
         .await?;
 
     tracing::info!("identify with the fixture proofs is rejected by the verifier");
@@ -58,7 +64,7 @@ pub(crate) async fn smoke_prod(client: &NodeClient, oprf_key_id: OprfKeyId) -> e
 pub(crate) async fn stress(
     client: NodeClient,
     request: StressRequest,
-    oprf_key_id: OprfKeyId,
+    oprf_key_id: NonIdentifierOprfKeyId,
     concurrency: NonZeroUsize,
     requests: NonZeroUsize,
 ) -> eyre::Result<()> {

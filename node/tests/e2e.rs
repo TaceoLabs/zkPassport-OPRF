@@ -8,7 +8,7 @@ use std::num::NonZeroUsize;
 use reqwest::StatusCode;
 use ruint::aliases::U160;
 use taceo_oprf::types::OprfKeyId;
-use zkpassport_oprf_authentication::{error_codes, registration_oprf_key_id};
+use zkpassport_oprf_authentication::{NonIdentifierOprfKeyId, error_codes, identifier_oprf_key_id};
 use zkpassport_oprf_test_utils::{
     fixtures::{CommitmentFixture, IdentifyFixture, load_v2_fixtures},
     node_client::{NodeClient, expect_rejected, expect_statuses},
@@ -32,14 +32,17 @@ async fn v2_lifecycle() -> eyre::Result<()> {
         NODES.map(str::to_owned).to_vec(),
         NonZeroUsize::try_from(THRESHOLD).expect("THRESHOLD is non-zero"),
     )?;
-    let customer_key_id = OprfKeyId::new(U160::from(CUSTOMER_OPRF_KEY_ID));
+    let customer_key_id = NonIdentifierOprfKeyId::new(U160::from(CUSTOMER_OPRF_KEY_ID))
+        .expect("not the identifier key");
     let fixtures = load_v2_fixtures();
 
-    let registration_key = client.oprf_public_key(registration_oprf_key_id()).await?;
-    let customer_key = client.oprf_public_key(customer_key_id).await?;
-    assert_ne!(registration_key.key, customer_key.key);
+    let identifier_key = client.oprf_public_key(identifier_oprf_key_id()).await?;
+    let customer_key = client
+        .oprf_public_key(OprfKeyId::from(customer_key_id))
+        .await?;
+    assert_ne!(identifier_key.key, customer_key.key);
 
-    assert_eq!(client.identify(&fixtures.identify).await?, registration_key);
+    assert_eq!(client.identify(&fixtures.identify).await?, identifier_key);
     // the dev-client may have registered the fixture on these nodes
     let statuses = client.register(&fixtures.register).await?;
     expect_statuses(&statuses, &[StatusCode::OK, StatusCode::CONFLICT])?;
@@ -48,14 +51,6 @@ async fn v2_lifecycle() -> eyre::Result<()> {
         customer_key
     );
     assert_eq!(client.face_match(customer_key_id).await?, customer_key);
-
-    // a client cannot choose the registration key
-    let result = client
-        .nullifier(registration_oprf_key_id(), &fixtures.query)
-        .await;
-    expect_rejected(result, error_codes::REQUESTED_OPRF_REGISTRATION_KEY)?;
-    let result = client.face_match(registration_oprf_key_id()).await;
-    expect_rejected(result, error_codes::REQUESTED_OPRF_REGISTRATION_KEY)?;
 
     // the verifier binds the proofs to the route and to the values the nodes forward
     let wrong_proofs = IdentifyFixture {

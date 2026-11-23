@@ -11,7 +11,7 @@ use eyre::Context as _;
 use reqwest::StatusCode;
 use taceo_oprf::{client::Error, types::OprfKeyId};
 use tokio::{sync::Semaphore, task::JoinSet};
-use zkpassport_oprf_authentication::{NonIdentifierOprfKeyId, error_codes, identifier_oprf_key_id};
+use zkpassport_oprf_authentication::{IDENTIFIER_OPRF_KEY_ID, NonIdentifierOprfKeyId, error_codes};
 use zkpassport_oprf_test_utils::{
     fixtures::{V2Fixtures, load_v2_fixtures},
     node_client::{NodeClient, describe_oprf_error, expect_rejected, expect_statuses},
@@ -58,12 +58,12 @@ async fn run_step(
     match (step, prod) {
         (SmokeStep::Online, _) => {
             client
-                .check_online(&[identifier_oprf_key_id(), OprfKeyId::from(oprf_key_id)])
+                .check_online(&[IDENTIFIER_OPRF_KEY_ID, OprfKeyId::from(oprf_key_id)])
                 .await
         }
         (SmokeStep::Identify, false) => {
             let expected_key = client
-                .oprf_public_key(identifier_oprf_key_id())
+                .oprf_public_key(IDENTIFIER_OPRF_KEY_ID)
                 .await
                 .context("load identifier public key")?;
             let key = oprf_result(client.identify(&fixtures.identify).await)?;

@@ -6,7 +6,7 @@
 //! * [`FaceMatchRequestAuth`] — the authentication payload sent by a client,
 //!   containing an OPRF key ID and a list of zkPassport proofs.
 //! * [`IdentifyRequestAuth`] — the authentication payload for passport
-//!   identification, which always uses the [`identifier_oprf_key_id`].
+//!   identification, which always uses the [`IDENTIFIER_OPRF_KEY_ID`].
 //! * [`NullifierRequestAuth`] — the authentication payload for nullifier
 //!   derivation for a registered [`SaltedIdentifier`].
 //! * [`ZKPassportProofResult`] — a single zkPassport proof matching the
@@ -27,6 +27,12 @@ use taceo_oprf::types::{
     api::{CloseFrameMessage, OprfRequestAuthenticatorError},
     ark_babyjubjub,
 };
+
+/// The OPRF key ID reserved for deriving identifiers, fixed to [`U160::MAX`].
+///
+/// Every deployment registers the identifier key under this ID. Changing it changes every
+/// user's identifier.
+pub const IDENTIFIER_OPRF_KEY_ID: OprfKeyId = OprfKeyId::new(U160::MAX);
 
 /// Unique, salted identifier `I` of a passport.
 ///
@@ -115,7 +121,7 @@ pub enum AuthModules {
     /// Face-match authentication using zkPassport zero-knowledge proofs.
     FaceMatch,
     /// First registration step, deriving the salted identifier under the
-    /// [`identifier_oprf_key_id`].
+    /// [`IDENTIFIER_OPRF_KEY_ID`].
     Identify,
     /// Default nullifier authentication module proving knowledge of a secret in zk.
     Nullifier,
@@ -159,7 +165,7 @@ impl FaceMatchRequestAuth {
 /// Authentication payload attached to an identify OPRF request.
 ///
 /// The node verifies the embedded proofs before evaluating the OPRF with the
-/// [`identifier_oprf_key_id`].
+/// [`IDENTIFIER_OPRF_KEY_ID`].
 #[derive(Clone, Serialize, Deserialize)]
 pub struct IdentifyRequestAuth {
     /// zkPassport proofs that attest to the user's passport.
@@ -207,16 +213,7 @@ pub struct NullifierRequestAuth {
     pub proofs: Vec<ZKPassportProofResult>,
 }
 
-/// The OPRF key ID reserved for deriving identifiers, fixed to [`U160::MAX`].
-///
-/// Every deployment registers the identifier key under this ID. Changing it changes every
-/// user's identifier.
-#[must_use]
-pub fn identifier_oprf_key_id() -> OprfKeyId {
-    OprfKeyId::new(U160::MAX)
-}
-
-/// An [`OprfKeyId`] chosen by a client, which cannot be the [`identifier_oprf_key_id`].
+/// An [`OprfKeyId`] chosen by a client, which cannot be the [`IDENTIFIER_OPRF_KEY_ID`].
 ///
 /// Has the wire format of [`OprfKeyId`], but deserialization fails for the identifier key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -224,14 +221,14 @@ pub fn identifier_oprf_key_id() -> OprfKeyId {
 pub struct NonIdentifierOprfKeyId(OprfKeyId);
 
 impl NonIdentifierOprfKeyId {
-    /// Creates a `NonIdentifierOprfKeyId` if `id` is not the [`identifier_oprf_key_id`].
+    /// Creates a `NonIdentifierOprfKeyId` if `id` is not the [`IDENTIFIER_OPRF_KEY_ID`].
     #[must_use]
     pub fn new(id: U160) -> Option<Self> {
         Self::try_from(OprfKeyId::new(id)).ok()
     }
 }
 
-/// The [`OprfKeyId`] is the [`identifier_oprf_key_id`].
+/// The [`OprfKeyId`] is the [`IDENTIFIER_OPRF_KEY_ID`].
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("the identifier OPRF key cannot be requested")]
 pub struct IdentifierKeyRequested;
@@ -240,7 +237,7 @@ impl TryFrom<OprfKeyId> for NonIdentifierOprfKeyId {
     type Error = IdentifierKeyRequested;
 
     fn try_from(id: OprfKeyId) -> Result<Self, Self::Error> {
-        if id == identifier_oprf_key_id() {
+        if id == IDENTIFIER_OPRF_KEY_ID {
             Err(IdentifierKeyRequested)
         } else {
             Ok(Self(id))
@@ -467,13 +464,8 @@ mod tests {
     }
 
     #[test]
-    fn identifier_oprf_key_id_is_u160_max() {
-        assert_eq!(identifier_oprf_key_id().into_inner(), U160::MAX);
-    }
-
-    #[test]
     fn non_identifier_oprf_key_id_rejects_identifier_key() {
-        let identifier_key = json!(identifier_oprf_key_id());
+        let identifier_key = json!(IDENTIFIER_OPRF_KEY_ID);
         serde_json::from_value::<NonIdentifierOprfKeyId>(identifier_key).expect_err("rejected");
         let other = json!(OprfKeyId::new(U160::MAX - U160::from(1)));
         serde_json::from_value::<NonIdentifierOprfKeyId>(other).expect("accepted");

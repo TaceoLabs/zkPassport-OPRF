@@ -4,7 +4,7 @@ use taceo_oprf::types::{
     async_trait::async_trait,
 };
 use tracing::instrument;
-use zkpassport_oprf_authentication::{AuthErrorKind, IdentifyRequestAuth, identifier_oprf_key_id};
+use zkpassport_oprf_authentication::{AuthErrorKind, IDENTIFIER_OPRF_KEY_ID, IdentifyRequestAuth};
 
 use crate::{
     metrics,
@@ -13,7 +13,7 @@ use crate::{
 
 /// Authenticator for passport registration.
 ///
-/// Always evaluates under the [`identifier_oprf_key_id`] (the client cannot
+/// Always evaluates under the [`IDENTIFIER_OPRF_KEY_ID`] (the client cannot
 /// choose the key) and verifies the zkPassport proofs through the oracle. Implements
 /// [`OprfRequestAuthenticator`] and is registered on the OPRF service builder for the
 /// `/identify` authentication module.
@@ -47,7 +47,7 @@ impl OprfRequestAuthenticator for IdentifyAuthenticator {
             .inspect_err(OracleError::log)
             .map_err(|err| OprfRequestAuthenticatorError::from(AuthErrorKind::from(err)))?;
         tracing::trace!("oracle accepted the identify proofs");
-        Ok(identifier_oprf_key_id())
+        Ok(IDENTIFIER_OPRF_KEY_ID)
     }
 }
 
@@ -61,7 +61,7 @@ mod tests {
     };
     use uuid::Uuid;
     use zkpassport_oprf_authentication::{
-        IdentifyRequestAuth, error_codes, identifier_oprf_key_id,
+        IDENTIFIER_OPRF_KEY_ID, IdentifyRequestAuth, error_codes,
     };
     use zkpassport_oprf_test_utils::fixtures::FixtureData;
 
@@ -89,7 +89,7 @@ mod tests {
         let oracle = Arc::new(TestOracleProxy::accept());
         let auth_service = IdentifyAuthenticator::init(oracle.clone());
         let oprf_key = auth_service.authenticate(&request).await?;
-        assert_eq!(oprf_key, identifier_oprf_key_id());
+        assert_eq!(oprf_key, IDENTIFIER_OPRF_KEY_ID);
         assert_eq!(
             oracle.take_calls(),
             vec![OracleCall::SaltedIdentifier {

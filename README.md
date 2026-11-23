@@ -26,7 +26,7 @@ This is a monorepo containing:
 Install smart-contract dependencies:
 
 ```sh
-cd contracts && forge install
+cd contracts && forge soldeer install
 ```
 
 ## Test & Run

@@ -70,13 +70,14 @@ Log files for all processes are written to the `logs/` directory. Press `Ctrl+C`
 
 ## Testing deployed systems
 
-The `dev-client` runs the fixtures against nodes given with `--nodes <url>,<url>,<url>` (`OPRF_DEV_CLIENT_NODES`) and the customer key with `--oprf-key-id`. It also works against the local setup.
+The `dev-client` runs the fixtures against nodes given with `--nodes <url>,<url>,<url>` (`OPRF_DEV_CLIENT_NODES`) and the customer key with `--oprf-key-id`. It also works against the local setup. To inspect a single node, pass one URL with `--threshold 1`.
 
 | Environment | Command |
 |---|---|
-| `dev` (`devmode=true`, the fixtures verify) | `just run-dev-client smoke`: verifies that identify returns the deployed identifier key, then runs the rest of the smoke flow. Repeatable |
+| `dev` (`devmode=true`, the fixtures verify) | `just run-dev-client smoke`: runs all steps, `identify` checks that it returns the deployed identifier key. Repeatable |
+| `dev`, single steps | `just run-dev-client smoke register query`: runs only the given steps (`online`, `identify`, `register`, `query`, `face-match`) in that order. `query` needs the fixture to be registered |
 | `dev`, load test | `just run-dev-client stress identify --concurrency 10 --requests 100`, `stress nullifier` |
-| other (`devmode=false`) | `just run-dev-client smoke --prod`: checks that the nodes are up, serve the deployed identifier key, and reject the fixture proofs |
+| other (`devmode=false`) | `just run-dev-client smoke --prod`: checks that the nodes are up, serve the deployed identifier key, and reject the fixture proofs, writes nothing. Supports the steps `online` and `identify` |
 
 The fixtures allow one rotation per node database. Only the end-to-end test rotates, and it targets the local setup. Afterwards `smoke` and `stress nullifier` fail on that setup until it is restarted.
 

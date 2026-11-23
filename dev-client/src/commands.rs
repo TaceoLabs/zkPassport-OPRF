@@ -13,60 +13,97 @@ use taceo_oprf::{client::Error, types::OprfKeyId};
 use tokio::{sync::Semaphore, task::JoinSet};
 use zkpassport_oprf_authentication::{NonIdentifierOprfKeyId, error_codes, identifier_oprf_key_id};
 use zkpassport_oprf_test_utils::{
-    fixtures::load_v2_fixtures,
-    node_client::{NodeClient, expect_rejected, expect_statuses},
+    fixtures::{V2Fixtures, load_v2_fixtures},
+    node_client::{NodeClient, describe_oprf_error, expect_rejected, expect_statuses},
 };
 
-use crate::StressRequest;
+use crate::{SmokeStep, StressRequest};
 
 pub(crate) async fn smoke(
     client: &NodeClient,
     oprf_key_id: NonIdentifierOprfKeyId,
+    steps: Vec<SmokeStep>,
+    prod: bool,
 ) -> eyre::Result<()> {
+    let steps = if !steps.is_empty() {
+        steps
+    } else if prod {
+        vec![SmokeStep::Online, SmokeStep::Identify]
+    } else {
+        vec![
+            SmokeStep::Online,
+            SmokeStep::Identify,
+            SmokeStep::Register,
+            SmokeStep::Query,
+            SmokeStep::FaceMatch,
+        ]
+    };
     let fixtures = load_v2_fixtures();
-
-    tracing::info!("identify");
-    let expected_key = client
-        .oprf_public_key(identifier_oprf_key_id())
-        .await
-        .context("load identifier public key")?;
-    let identify_key = client
-        .identify(&fixtures.identify)
-        .await
-        .context("identify")?;
-    eyre::ensure!(
-        identify_key == expected_key,
-        "identify returned a different public key or epoch than the nodes serve for the identifier key"
-    );
-
-    tracing::info!("register");
-    let statuses = client.register(&fixtures.register).await?;
-    expect_statuses(&statuses, &[StatusCode::OK, StatusCode::CONFLICT]).context("register")?;
-
-    tracing::info!("query");
-    client
-        .nullifier(oprf_key_id, &fixtures.query)
-        .await
-        .context("query")?;
-
-    tracing::info!("face match");
-    client.face_match(oprf_key_id).await.context("face match")?;
+    for step in steps {
+        tracing::info!("{step:?}");
+        run_step(client, oprf_key_id, &fixtures, step, prod)
+            .await
+            .with_context(|| format!("smoke step {step:?}"))?;
+    }
     Ok(())
 }
 
-pub(crate) async fn smoke_prod(
+async fn run_step(
     client: &NodeClient,
     oprf_key_id: NonIdentifierOprfKeyId,
+    fixtures: &V2Fixtures,
+    step: SmokeStep,
+    prod: bool,
 ) -> eyre::Result<()> {
-    tracing::info!("nodes are online");
-    client
-        .check_online(&[identifier_oprf_key_id(), OprfKeyId::from(oprf_key_id)])
-        .await?;
+    match (step, prod) {
+        (SmokeStep::Online, _) => {
+            client
+                .check_online(&[identifier_oprf_key_id(), OprfKeyId::from(oprf_key_id)])
+                .await
+        }
+        (SmokeStep::Identify, false) => {
+            let expected_key = client
+                .oprf_public_key(identifier_oprf_key_id())
+                .await
+                .context("load identifier public key")?;
+            let key = oprf_result(client.identify(&fixtures.identify).await)?;
+            eyre::ensure!(
+                key == expected_key,
+                "identify returned a different public key or epoch than the nodes serve for the identifier key"
+            );
+            tracing::info!(epoch = ?key.epoch, "accepted");
+            Ok(())
+        }
+        (SmokeStep::Identify, true) => {
+            let result = client.identify(&fixtures.identify).await;
+            expect_rejected(result, error_codes::ORACLE_BAD_REQUEST)
+        }
+        (SmokeStep::Register, false) => {
+            let responses = client.register(&fixtures.register).await?;
+            expect_statuses(&responses, &[StatusCode::OK, StatusCode::CONFLICT])?;
+            for response in responses {
+                tracing::info!(node = response.node, status = %response.status, "responded");
+            }
+            Ok(())
+        }
+        (SmokeStep::Query, false) => {
+            let key = oprf_result(client.nullifier(oprf_key_id, &fixtures.query).await)?;
+            tracing::info!(epoch = ?key.epoch, "accepted");
+            Ok(())
+        }
+        (SmokeStep::FaceMatch, false) => {
+            let key = oprf_result(client.face_match(oprf_key_id).await)?;
+            tracing::info!(epoch = ?key.epoch, "accepted");
+            Ok(())
+        }
+        (SmokeStep::Register | SmokeStep::Query | SmokeStep::FaceMatch, true) => {
+            eyre::bail!("not supported with --prod, which writes nothing")
+        }
+    }
+}
 
-    tracing::info!("identify with the fixture proofs is rejected by the verifier");
-    let fixtures = load_v2_fixtures();
-    let result = client.identify(&fixtures.identify).await;
-    expect_rejected(result, error_codes::ORACLE_BAD_REQUEST).context("identify")
+fn oprf_result<T>(result: Result<T, Error>) -> eyre::Result<T> {
+    result.map_err(|err| eyre::eyre!(describe_oprf_error(&err)))
 }
 
 pub(crate) async fn stress(
@@ -80,8 +117,8 @@ pub(crate) async fn stress(
     let client = Arc::new(client);
     let fixtures = Arc::new(load_v2_fixtures());
     if request == StressRequest::Nullifier {
-        let statuses = client.register(&fixtures.register).await?;
-        expect_statuses(&statuses, &[StatusCode::OK, StatusCode::CONFLICT]).context("register")?;
+        let responses = client.register(&fixtures.register).await?;
+        expect_statuses(&responses, &[StatusCode::OK, StatusCode::CONFLICT]).context("register")?;
     }
     let in_flight = Arc::new(Semaphore::new(concurrency.get()));
     let mut tasks = JoinSet::new();

@@ -25,6 +25,14 @@ use crate::fixtures::{CommitmentFixture, IdentifyFixture, QueryFixture, load_fix
 
 const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// The response of one node to an HTTP API request.
+#[derive(Debug)]
+pub struct NodeResponse {
+    pub node: String,
+    pub status: StatusCode,
+    pub body: String,
+}
+
 /// Client for a set of OPRF nodes.
 pub struct NodeClient {
     nodes: Vec<String>,
@@ -99,8 +107,8 @@ impl NodeClient {
             .await
     }
 
-    /// Posts the registration to every node and returns the status of each.
-    pub async fn register(&self, fixture: &CommitmentFixture) -> eyre::Result<Vec<StatusCode>> {
+    /// Posts the registration to every node and returns the response of each.
+    pub async fn register(&self, fixture: &CommitmentFixture) -> eyre::Result<Vec<NodeResponse>> {
         let request = RegistrationRequest {
             salted_identifier: fixture.salted_identifier,
             commitment: fixture.commitment,
@@ -109,8 +117,8 @@ impl NodeClient {
         self.post_to_all("registration", &request).await
     }
 
-    /// Posts the rotation to every node and returns the status of each.
-    pub async fn rotate(&self, fixture: &CommitmentFixture) -> eyre::Result<Vec<StatusCode>> {
+    /// Posts the rotation to every node and returns the response of each.
+    pub async fn rotate(&self, fixture: &CommitmentFixture) -> eyre::Result<Vec<NodeResponse>> {
         let request = CommitmentRotationRequest {
             salted_identifier: fixture.salted_identifier,
             new_commitment: fixture.commitment,
@@ -188,8 +196,8 @@ impl NodeClient {
         &self,
         path: &str,
         body: &impl Serialize,
-    ) -> eyre::Result<Vec<StatusCode>> {
-        let mut statuses = Vec::with_capacity(self.nodes.len());
+    ) -> eyre::Result<Vec<NodeResponse>> {
+        let mut responses = Vec::with_capacity(self.nodes.len());
         for node in &self.nodes {
             let response = self
                 .http
@@ -198,9 +206,18 @@ impl NodeClient {
                 .send()
                 .await
                 .with_context(|| format!("while posting to {node}"))?;
-            statuses.push(response.status());
+            let status = response.status();
+            let body = response
+                .text()
+                .await
+                .with_context(|| format!("while reading the response of {node}"))?;
+            responses.push(NodeResponse {
+                node: node.clone(),
+                status,
+                body,
+            });
         }
-        Ok(statuses)
+        Ok(responses)
     }
 
     async fn get_ok(&self, url: &str) -> eyre::Result<reqwest::Response> {
@@ -210,11 +227,11 @@ impl NodeClient {
             .send()
             .await
             .with_context(|| format!("while requesting {url}"))?;
-        eyre::ensure!(
-            response.status() == StatusCode::OK,
-            "{url} returned {}",
-            response.status()
-        );
+        let status = response.status();
+        if status != StatusCode::OK {
+            let body = response.text().await.unwrap_or_default();
+            eyre::bail!("{url} returned {status}: {body}");
+        }
         Ok(response)
     }
 }
@@ -228,16 +245,22 @@ fn tls_connector() -> Connector {
     Connector::Rustls(Arc::new(config))
 }
 
-/// Checks that every status is one of `allowed`.
+/// Checks that every response has one of the `allowed` statuses.
 ///
 /// # Errors
-/// Returns an error naming the statuses if one is not allowed.
-pub fn expect_statuses(statuses: &[StatusCode], allowed: &[StatusCode]) -> eyre::Result<()> {
-    eyre::ensure!(
-        statuses.iter().all(|status| allowed.contains(status)),
-        "got status codes {statuses:?}, expected {allowed:?}"
-    );
-    Ok(())
+/// Returns an error listing the status and body of every node if one is not allowed.
+pub fn expect_statuses(responses: &[NodeResponse], allowed: &[StatusCode]) -> eyre::Result<()> {
+    if responses.iter().all(|r| allowed.contains(&r.status)) {
+        return Ok(());
+    }
+    let details: Vec<String> = responses
+        .iter()
+        .map(|r| format!("{}: {} {}", r.node, r.status, r.body))
+        .collect();
+    eyre::bail!(
+        "expected status codes {allowed:?}, got:\n{}",
+        details.join("\n")
+    )
 }
 
 /// Checks that `result` is a rejection by the nodes with `error_code`.
@@ -247,7 +270,31 @@ pub fn expect_statuses(statuses: &[StatusCode], allowed: &[StatusCode]) -> eyre:
 pub fn expect_rejected<T>(result: Result<T, Error>, error_code: u16) -> eyre::Result<()> {
     match result {
         Err(Error::ThresholdServiceError(err)) if err.error_code == error_code => Ok(()),
-        Err(err) => eyre::bail!("expected rejection with code {error_code}, got: {err}"),
+        Err(err) => eyre::bail!(
+            "expected rejection with code {error_code}, got: {}",
+            describe_oprf_error(&err)
+        ),
         Ok(_) => eyre::bail!("expected rejection with code {error_code}, but it was accepted"),
     }
+}
+
+/// Like the `Display` of `err`, but includes the errors of the individual nodes.
+#[must_use]
+pub fn describe_oprf_error(err: &Error) -> String {
+    match err {
+        Error::NodeErrorDisagreement(errors) => {
+            format!("{err}:\n{}", list_lines(errors))
+        }
+        Error::Networking(errors) => format!("{err}:\n{}", list_lines(errors)),
+        Error::EpochMismatch(epochs) => format!("{err}: {epochs:?}"),
+        err => err.to_string(),
+    }
+}
+
+fn list_lines(errors: &[impl std::fmt::Display]) -> String {
+    errors
+        .iter()
+        .map(|err| format!("  - {err}"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }

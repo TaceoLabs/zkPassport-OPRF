@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.2.0](https://github.com/TaceoLabs/zkPassport-OPRF/compare/taceo-zkpassport-oprf-authentication-v0.1.0...taceo-zkpassport-oprf-authentication-v0.2.0)
+
+### ⛰️ Features
+
+
+- *(dev-client)* Check that smoke identify returns the identifier key - ([3a2d11e](https://github.com/TaceoLabs/zkPassport-OPRF/commit/3a2d11efd13f7b815b6711e93b8946c193ea06b6))
+- *(node)* Add semaphore around oracle proxy - ([8e5b78f](https://github.com/TaceoLabs/zkPassport-OPRF/commit/8e5b78f7e8c7dad46ab9bf34e3067417abddd590))
+- *(node)* Add impl for requests v2 - ([8702c9a](https://github.com/TaceoLabs/zkPassport-OPRF/commit/8702c9a3b1afe35b2d2bdb02d9ca4f7bb31b395b))
+- *(node)* Add auth-module for v2 nullifier route - ([2bc101d](https://github.com/TaceoLabs/zkPassport-OPRF/commit/2bc101d7c8932b3e8939f0e40bce75abf558a4d3))
+- *(node)* Added axum routes for non-oprf calls and some new-types - ([a0eed03](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a0eed037eab53fb3b38e9f020fd342be9714654b))
+- *(node)* Adds stubs for the proxy - ([d531423](https://github.com/TaceoLabs/zkPassport-OPRF/commit/d531423158fa585a3f99a470e40800bce2d4bff8))
+- [**breaking**] Fix the identifier OPRF key ID to U160::MAX - ([243f60d](https://github.com/TaceoLabs/zkPassport-OPRF/commit/243f60d0df28540aca90c62f3652f2866b0b17c9))
+- Add registration endpoint that persists identifier and commitment - ([9a45f51](https://github.com/TaceoLabs/zkPassport-OPRF/commit/9a45f51025d15c9a86ab40f6d0b4f4d2cd4f3dab))
+- Add register auth module - ([f465d00](https://github.com/TaceoLabs/zkPassport-OPRF/commit/f465d00697e6476ccac89cb9048587b8d87fd11c))
+
+### 🐛 Bug Fixes
+
+
+- *(node)* Reject the registration key in the face-match module - ([2fb5b0b](https://github.com/TaceoLabs/zkPassport-OPRF/commit/2fb5b0b3c1a6d9df89770a75e852bf967eb327b4))
+
+### 🚜 Refactor
+
+
+- *(clippy)* Nightly fmt - ([316c212](https://github.com/TaceoLabs/zkPassport-OPRF/commit/316c212f59b1c3d2f1cdfbcb186c67cb6a881b9a))
+- *(dev-client)* Replace upstream dev-client with smoke and stress commands - ([63e3e92](https://github.com/TaceoLabs/zkPassport-OPRF/commit/63e3e929b57e2ebdf33bf2286d047aa62f73ce0e))
+- *(node)* [**breaking**] Rename register auth module to identify - ([ef62909](https://github.com/TaceoLabs/zkPassport-OPRF/commit/ef629094608c8fceeddece009fb00b085496660f))
+- *(node)* [**breaking**] Remove health check service - ([c71dd4a](https://github.com/TaceoLabs/zkPassport-OPRF/commit/c71dd4accf2a10759132f7ecea04658ad404a1e9))
+- *(node)* Add v2 service and move face-match to v1. Adds an oracle proxy - ([284b746](https://github.com/TaceoLabs/zkPassport-OPRF/commit/284b7466fcdbf696c2e8d3d93c2768da65fe0abc))
+- Timeout of oracle proxy is no longer retryable - ([fd95dba](https://github.com/TaceoLabs/zkPassport-OPRF/commit/fd95dba78e59079970b921a029cfa53519c70b0a))
+- Remove client crate - ([4aa34ba](https://github.com/TaceoLabs/zkPassport-OPRF/commit/4aa34ba926cfa728c2bce1349ac2aa85e0751759))
+- Remove dead struct that was not used - ([7f9bf45](https://github.com/TaceoLabs/zkPassport-OPRF/commit/7f9bf450af84611752270527b8832c39aa491e0f))
+
+### 🏗️ Build
+
+
+- *(deps)* Bump to taceo-oprf v0.22.0 - ([f13dedb](https://github.com/TaceoLabs/zkPassport-OPRF/commit/f13dedb6e160b809679645249c108fcc7e94bad5))
+
+### 📚 Documentation
+
+
+- Correct dev-client, e2e and HTTP API descriptions - ([9078c2d](https://github.com/TaceoLabs/zkPassport-OPRF/commit/9078c2d63faf4277534c4fa64bfb1974d7a37f43))
+
+### 🧪 Testing
+
+
+- *(node)* Add e2e test against the local setup - ([a98e04d](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a98e04d14dffb57d31136cfc33599602ca2e8181))
+- Refactor dev-client to test specific parts - ([169ed2b](https://github.com/TaceoLabs/zkPassport-OPRF/commit/169ed2b64507fefc0d13493211e95a5d1ddfa0e0))
+- Add unit tests and integration test suite ([#206](https://github.com/TaceoLabs/zkPassport-OPRF/pull/206)) - ([45e4666](https://github.com/TaceoLabs/zkPassport-OPRF/commit/45e4666efe90bce98a71c595513c85677129d99c))
+
+
 ## [0.1.0]
 
 ### ⛰️ Features

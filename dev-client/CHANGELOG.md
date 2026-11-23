@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.2.0](https://github.com/TaceoLabs/zkPassport-OPRF/compare/taceo-zkpassport-dev-client-v0.1.0...taceo-zkpassport-dev-client-v0.2.0)
+
+### ⛰️ Features
+
+
+- *(dev-client)* Check that smoke identify returns the identifier key - ([3a2d11e](https://github.com/TaceoLabs/zkPassport-OPRF/commit/3a2d11efd13f7b815b6711e93b8946c193ea06b6))
+- *(node)* Add impl for requests v2 - ([8702c9a](https://github.com/TaceoLabs/zkPassport-OPRF/commit/8702c9a3b1afe35b2d2bdb02d9ca4f7bb31b395b))
+- *(node)* Added axum routes for non-oprf calls and some new-types - ([a0eed03](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a0eed037eab53fb3b38e9f020fd342be9714654b))
+- *(node)* Adds stubs for the proxy - ([d531423](https://github.com/TaceoLabs/zkPassport-OPRF/commit/d531423158fa585a3f99a470e40800bce2d4bff8))
+- [**breaking**] Fix the identifier OPRF key ID to U160::MAX - ([243f60d](https://github.com/TaceoLabs/zkPassport-OPRF/commit/243f60d0df28540aca90c62f3652f2866b0b17c9))
+
+### 🚜 Refactor
+
+
+- *(dev-client)* Replace upstream dev-client with smoke and stress commands - ([63e3e92](https://github.com/TaceoLabs/zkPassport-OPRF/commit/63e3e929b57e2ebdf33bf2286d047aa62f73ce0e))
+- *(node)* [**breaking**] Remove health check service - ([c71dd4a](https://github.com/TaceoLabs/zkPassport-OPRF/commit/c71dd4accf2a10759132f7ecea04658ad404a1e9))
+- *(node)* Add v2 service and move face-match to v1. Adds an oracle proxy - ([284b746](https://github.com/TaceoLabs/zkPassport-OPRF/commit/284b7466fcdbf696c2e8d3d93c2768da65fe0abc))
+- Timeout of oracle proxy is no longer retryable - ([fd95dba](https://github.com/TaceoLabs/zkPassport-OPRF/commit/fd95dba78e59079970b921a029cfa53519c70b0a))
+- Remove client crate - ([4aa34ba](https://github.com/TaceoLabs/zkPassport-OPRF/commit/4aa34ba926cfa728c2bce1349ac2aa85e0751759))
+
+### 🏗️ Build
+
+
+- *(deps)* Bump to taceo-oprf v0.22.0 - ([f13dedb](https://github.com/TaceoLabs/zkPassport-OPRF/commit/f13dedb6e160b809679645249c108fcc7e94bad5))
+
+### 📚 Documentation
+
+
+- Correct dev-client, e2e and HTTP API descriptions - ([9078c2d](https://github.com/TaceoLabs/zkPassport-OPRF/commit/9078c2d63faf4277534c4fa64bfb1974d7a37f43))
+
+### 🧪 Testing
+
+
+- *(node)* Add e2e test against the local setup - ([a98e04d](https://github.com/TaceoLabs/zkPassport-OPRF/commit/a98e04d14dffb57d31136cfc33599602ca2e8181))
+- *(test-utils)* Return the OPRF public key from NodeClient - ([319f171](https://github.com/TaceoLabs/zkPassport-OPRF/commit/319f17130ca2a247d659a290a935d6ca819d24e2))
+- Refactor dev-client to test specific parts - ([169ed2b](https://github.com/TaceoLabs/zkPassport-OPRF/commit/169ed2b64507fefc0d13493211e95a5d1ddfa0e0))
+
+### 🌀 Other
+
+
+- Lints for Cargo.toml - ([960740e](https://github.com/TaceoLabs/zkPassport-OPRF/commit/960740ec7384564d3e2b5ef6e7808c857712bc01))
+
+
 ## [0.1.0]
 
 ### ⛰️ Features

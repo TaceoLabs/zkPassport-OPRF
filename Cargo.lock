@@ -3625,12 +3625,12 @@ dependencies = [
 
 [[package]]
 name = "jiff"
-version = "1.0.0"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cc767b5763de45e810109520123bb2829a653f3a7ed9be40b2bc4f81158f595"
+checksum = "107f2e89536b6818514025f6787b0d94d819e54fe3b40365275fc753de485b3f"
 dependencies = [
- "jiff-core 1.0.0",
- "jiff-static 1.0.0",
+ "jiff-core 1.0.2",
+ "jiff-static 1.0.3",
  "log",
  "portable-atomic",
  "portable-atomic-util",
@@ -3649,9 +3649,9 @@ dependencies = [
 
 [[package]]
 name = "jiff-core"
-version = "1.0.0"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "894f7ac42105f584100691b3bf6e6b92dd12fcfa225f6c397f95c8a94b47b68f"
+checksum = "d44c923edf2bf456a982253f1a9ee1f6e89e421dffd0065d9b9a581da0def58f"
 dependencies = [
  "log",
 ]
@@ -3670,11 +3670,11 @@ dependencies = [
 
 [[package]]
 name = "jiff-static"
-version = "1.0.0"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "955491488dc99b572ea6d67b172dcd98787d00744b1fb44a5689b4e6413695a6"
+checksum = "4996f71e569e3a3e32b925c28ef8f0027dc30bb1d594b33eeda409eea185f5c8"
 dependencies = [
- "jiff-core 1.0.0",
+ "jiff-core 1.0.2",
  "proc-macro2",
  "quote",
  "syn 3.0.3",
@@ -5948,7 +5948,7 @@ dependencies = [
  "backon",
  "eyre",
  "git-version",
- "jiff 1.0.0",
+ "jiff 1.0.3",
  "log",
  "reserve-port",
  "secrecy",
@@ -6037,7 +6037,7 @@ dependencies = [
  "ciborium",
  "eyre",
  "http",
- "jiff 1.0.0",
+ "jiff 1.0.3",
  "metrics",
  "moka",
  "parking_lot",
@@ -6162,7 +6162,7 @@ dependencies = [
  "backon",
  "config",
  "eyre",
- "jiff 1.0.0",
+ "jiff 1.0.3",
  "metrics",
  "reqwest",
  "ruint",
